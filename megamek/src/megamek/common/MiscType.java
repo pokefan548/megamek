@@ -1834,6 +1834,7 @@ public class MiscType extends EquipmentType {
         EquipmentType.addType(MiscType.createISAblativeFlakStandardArmorInfArmor());
         EquipmentType.addType(MiscType.createISAblativeFlakConcealedArmorInfArmor());
         EquipmentType.addType(MiscType.createISBallisicPlateStandardInfArmor());
+        EquipmentType.addType(MiscType.createISBallisicPlateVestInfArmor());
         EquipmentType.addType(MiscType.createBallisicPlateConcealedInfArmor());
         EquipmentType.addType(MiscType.createClothingFatiguesInfArmor());
         EquipmentType.addType(MiscType.createClothingLeatherHideInfArmor());
@@ -1848,6 +1849,7 @@ public class MiscType extends EquipmentType {
         EquipmentType.addType(MiscType.createISMechWarriorCombatSuitInfArmor());
         EquipmentType.addType(MiscType.createISMechWarriorCoolingSuitInfArmor());
         EquipmentType.addType(MiscType.createMechWarriorCoolingVestInfArmor());
+        EquipmentType.addType(MiscType.createTankerSmockInfArmor());
         EquipmentType.addType(MiscType.createMyomerSuitInfArmor());
         EquipmentType.addType(MiscType.createMyomerVestInfArmor());
         EquipmentType.addType(MiscType.createParkaInfArmor());
@@ -1881,6 +1883,11 @@ public class MiscType extends EquipmentType {
         EquipmentType.addType(MiscType.createISSneakCamoECMInfArmor());
         EquipmentType.addType(MiscType.createISSneakIRECMInfArmor());
         EquipmentType.addType(MiscType.createISSneakThreeSystemInfArmor());
+        EquipmentType.addType(MiscType.createBoguInfArmor());
+        EquipmentType.addType(MiscType.createOyoriAncientInfArmor());
+        EquipmentType.addType(MiscType.createOyoriModernInfArmor());
+        EquipmentType.addType(MiscType.createKnightPlateAncientInfArmor());
+        EquipmentType.addType(MiscType.createKnightPlateModernInfArmor());
 
     }
 
@@ -3654,9 +3661,11 @@ public class MiscType extends EquipmentType {
 
         return misc;
     }
-
-    // Armor (Conventional Infantry)
-
+  
+    //////////////////////////////////////
+    // BEGIN CONVENTIONAL INFANTRY ARMOR//
+    //////////////////////////////////////
+  
     public static MiscType createISAblativeStandardInfArmor() {
         MiscType misc = new MiscType();
 
@@ -3753,6 +3762,27 @@ public class MiscType extends EquipmentType {
         misc.cost = 1600;
         misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
         misc.rulesRefs = "317, TO";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_D)
+                .setAvailability(RATING_C, RATING_C, RATING_C, RATING_C)
+                .setISAdvancement(2305, 2310, 2315, DATE_NONE, DATE_NONE)
+                .setISApproximate(true, false, false, false, false)
+                .setClanAdvancement(2305, 2310, 2315, DATE_NONE, DATE_NONE)
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TA)
+                .setProductionFactions(F_TA);
+        return misc;
+    }
+  
+    public static MiscType createISBallisicPlateVestInfArmor() {
+        MiscType misc = new MiscType();
+
+        misc.name = "Ballistic Plate, Vest";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("ISBallisticPlateVest");
+        misc.addLookupName("CLBallisticPlateVest");
+        misc.damageDivisor = 2.0;
+        misc.cost = 600;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "288, AToW";
         misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_D)
                 .setAvailability(RATING_C, RATING_C, RATING_C, RATING_C)
                 .setISAdvancement(2305, 2310, 2315, DATE_NONE, DATE_NONE)
@@ -4044,6 +4074,26 @@ public class MiscType extends EquipmentType {
                 .setClanAdvancement(2440, 2460, 2461, DATE_NONE, DATE_NONE)
                 .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)
                 .setProductionFactions(F_TH);
+        return misc;
+    }
+  
+      public static MiscType createTankerSmockInfArmor() {
+        MiscType misc = new MiscType();
+
+        misc.name = "Tanker's Smock";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("TankerSmock");
+        misc.damageDivisor = 2;
+        misc.cost = 275;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "295, AToW";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_C)
+                .setAvailability(RATING_B, RATING_C, RATING_B, RATING_B)<!>
+                .setISAdvancement(2440, 2460, 2461, DATE_NONE, DATE_NONE)<!>
+                .setISApproximate(true, false, false, true, false)<!>
+                .setClanAdvancement(2440, 2460, 2461, DATE_NONE, DATE_NONE)<!>
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)<!>
+                .setProductionFactions(F_TH);<!>
         return misc;
     }
 
@@ -4726,7 +4776,117 @@ public class MiscType extends EquipmentType {
                 .setProductionFactions(F_TH);
         return misc;
     }
+  
+    //Exotic Armor
+  
+    public static MiscType createBoguInfArmor() {
+        MiscType misc = new MiscType();
 
+        misc.name = "Bogu (Kendo Practice Armor)";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("Bogu");
+        misc.damageDivisor = 0.5;
+        misc.cost = 75;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "295, AToW";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_B)
+                .setAvailability(RATING_C, RATING_C, RATING_C, RATING_E)<!>
+                .setISAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setISApproximate(true, false, false, false, false)<!>
+                .setClanAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)<!>
+                .setProductionFactions(F_DC);
+        return misc;
+    }
+  
+    public static MiscType createOyoriAncientInfArmor() {
+        MiscType misc = new MiscType();
+
+        misc.name = "Oyori (Ancient)";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("OyoriAncient");
+        misc.damageDivisor = 1.0;
+        misc.subType = S_ENCUMBERING;
+        misc.cost = 50000;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "295, AToW";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_A)
+                .setAvailability(RATING_F, RATING_F, RATING_F, RATING_E)<!>
+                .setISAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setISApproximate(true, false, false, false, false)<!>
+                .setClanAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)<!>
+                .setProductionFactions(F_DC);
+        return misc;
+    }
+  
+    public static MiscType createOyoriModernInfArmor() {
+        MiscType misc = new MiscType();
+
+        misc.name = "Oyori (Modern)";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("OyoriModern");
+        misc.damageDivisor = 2.0;
+        misc.subType = S_ENCUMBERING;
+        misc.cost = 2000;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "295, AToW";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_D)
+                .setAvailability(RATING_E, RATING_E, RATING_E, RATING_E)<!>
+                .setISAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setISApproximate(true, false, false, false, false)<!>
+                .setClanAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)<!>
+                .setProductionFactions(F_DC);
+        return misc;
+    }
+  
+    public static MiscType createKnightPlateAncientInfArmor() {
+        MiscType misc = new MiscType();
+
+        misc.name = "Knight's Plate (Ancient)";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("KnightPlateAncient");
+        misc.damageDivisor = 1.0;
+        misc.subType = S_ENCUMBERING;
+        misc.cost = 49000;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "295, AToW";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_A)
+                .setAvailability(RATING_F, RATING_F, RATING_F, RATING_E)<!>
+                .setISAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setISApproximate(true, false, false, false, false)<!>
+                .setClanAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)<!>
+                .setProductionFactions(F_TH);<!>
+        return misc;
+    }
+  
+    public static MiscType createKnightPlateModernmor() {
+        MiscType misc = new MiscType();
+
+        misc.name = "Knight's Plate (Modern)";
+        misc.setInternalName(misc.name);
+        misc.addLookupName("KnightPlateModern");
+        misc.damageDivisor = 2.0;
+        misc.subType = S_ENCUMBERING;
+        misc.cost = 49000;
+        misc.flags = misc.flags.or(F_INF_EQUIPMENT).or(F_ARMOR_KIT);
+        misc.rulesRefs = "295, AToW";
+        misc.techAdvancement.setTechBase(TECH_BASE_ALL).setTechRating(RATING_C)
+                .setAvailability(RATING_E, RATING_F, RATING_E, RATING_E)<!>
+                .setISAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setISApproximate(true, false, false, false, false)<!>
+                .setClanAdvancement(2465, 2475, 2510, DATE_NONE, DATE_NONE)<!>
+                .setClanApproximate(true, false, false, false, false).setPrototypeFactions(F_TH)<!>
+                .setProductionFactions(F_TH);<!>
+        return misc;
+    }
+  
+  ///////////////////////////////////
+  //END CONVENTIONAL INFANTRY ARMOR//
+  ///////////////////////////////////
+  
     public static MiscType createISArmoredMotiveSystem() {
         MiscType misc = new MiscType();
         misc.name = "Armored Motive System";

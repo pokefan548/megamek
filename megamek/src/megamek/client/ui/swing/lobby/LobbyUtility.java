@@ -18,18 +18,7 @@
  */
 package megamek.client.ui.swing.lobby;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.FontMetrics;
-import java.awt.Graphics;
-import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.StringTokenizer;
-
+import megamek.MMConstants;
 import megamek.client.ui.Messages;
 import megamek.client.ui.swing.GUIPreferences;
 import megamek.client.ui.swing.util.UIUtil;
@@ -37,6 +26,10 @@ import megamek.common.*;
 import megamek.common.force.Force;
 import megamek.common.options.GameOptions;
 import megamek.common.options.OptionsConstants;
+
+import java.awt.*;
+import java.io.File;
+import java.util.*;
 
 /** 
  * This class provides static helper functions for the Lobby aka ChatLounge. 
@@ -146,14 +139,14 @@ public class LobbyUtility {
      * lower edge of the image for which the graphics g is given.
      */
     static void drawMinimapLabel(String text, int w, int h, Graphics g, boolean invalid) {
-        if (text.length() == 0) {
+        if (text.isBlank()) {
             return;
         }
         GUIPreferences.AntiAliasifSet(g);
         // The text size may grow with the width of the image, but no bigger than 16*guiscale
         // to avoid huge text
         int fontSize = Math.min(w / 10, UIUtil.scaleForGUI(16));
-        Font font = new Font("Dialog", Font.PLAIN, fontSize);
+        Font font = new Font(MMConstants.FONT_DIALOG, Font.PLAIN, fontSize);
         g.setFont(font);
         FontMetrics fm = g.getFontMetrics(font);
         int th = fm.getAscent() + fm.getDescent(); // The text height
@@ -282,8 +275,8 @@ public class LobbyUtility {
      */
     static boolean validateLobbyLoad(Collection<Entity> entities, Entity loader, int bayNumber,
             boolean loadRear, StringBuilder errorMsg) {
-        // Protomek loading uses only 1 entity, get that (doesnt matter if it's something else):
-        Entity soleProtomek = entities.stream().findAny().get();
+        // ProtoMek loading uses only 1 entity, get that (doesn't matter if it's something else)
+        Entity soleProtoMek = entities.stream().findAny().get();
         double capacity;
         boolean hasEnoughCargoCapacity;
         String errorMessage = "";
@@ -297,9 +290,9 @@ public class LobbyUtility {
                 errorMessage = Messages.getString("LoadingBay.baytoomany",
                         (int) bay.getUnusedSlots(), bay.getDefaultSlotDescription());
             } else if (loader.hasETypeFlag(Entity.ETYPE_MECH)
-                    && soleProtomek.hasETypeFlag(Entity.ETYPE_PROTOMECH)) {
+                    && soleProtoMek.hasETypeFlag(Entity.ETYPE_PROTOMECH)) {
                 // We're also using bay number to distinguish between front and rear locations
-                // for protomech mag clamp systems
+                // for ProtoMek mag clamp systems
                 hasEnoughCargoCapacity = entities.size() == 1;
                 errorMessage = Messages.getString("LoadingBay.protostoomany");
             } else {
@@ -420,11 +413,6 @@ public class LobbyUtility {
         errorMsg.append(errorMessage);
         return hasEnoughCargoCapacity;
     }
-
-    
-    // PRIVATE
-    //  
-    //
 
     /** 
      * Returns true when the two starting positions overlap, i.e.

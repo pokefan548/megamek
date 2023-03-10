@@ -165,11 +165,9 @@ public class EquipmentType implements ITechnology {
     protected boolean spreadable = false;
     protected int toHitModifier = 0;
 
-//    protected Map<Integer,Integer> techLevel = new HashMap<>();
-    
     protected TechAdvancement techAdvancement = new TechAdvancement();
 
-    protected BigInteger flags = BigInteger.valueOf(0);
+    protected BigInteger flags = BigInteger.ZERO;
 
     protected long subType = 0;
 
@@ -507,7 +505,7 @@ public class EquipmentType implements ITechnology {
     }
 
     public boolean hasFlag(BigInteger flag) {
-        return !(flags.and(flag)).equals(BigInteger.valueOf(0));
+        return !(flags.and(flag)).equals(BigInteger.ZERO);
     }
 
     public double getBV(Entity entity) {
@@ -591,8 +589,7 @@ public class EquipmentType implements ITechnology {
      * @param modes
      *            non null, non empty list of available mode names.
      */
-    protected void setModes(String[] modes) {
-        assert ((modes != null) && (modes.length > 0)) : "List of modes must not be null or empty";
+    protected void setModes(String... modes) {
         Vector<EquipmentMode> newModes = new Vector<>(modes.length);
         for (String mode : modes) {
             newModes.addElement(EquipmentMode.getMode(mode));
@@ -670,9 +667,9 @@ public class EquipmentType implements ITechnology {
      * <p>
      * Returns the mode number <code>modeNum</code> from the list of modes
      * available for this type of equipment. Modes are numbered from
-     * <code>0<code> to
-     * <code>getModesCount()-1</code>
-     * <p>
+     * <code>0</code> to
+     * <code>getModesCount() - 1</code>
+     * </p>
      * Fails if this type of the equipment doesn't have modes, or given mode is
      * out of the valid range.
      *
@@ -682,7 +679,6 @@ public class EquipmentType implements ITechnology {
      * @see #hasModes()
      */
     public EquipmentMode getMode(int modeNum) {
-        assert ((modes != null) && (modeNum >= 0) && (modeNum < modes.size())) : "Invalid Mode";
         return modes.elementAt(modeNum);
     }
 
@@ -1137,26 +1133,6 @@ public class EquipmentType implements ITechnology {
         return techAdvancement.getTechRating();
     }
 
-    /**
-     * @deprecated Use {@link #calcEraAvailability(int, boolean) calcEraAvailability to get availability
-     *      for IS/Clan in a given year, or {@link #getBaseAvailability(int) getBaseAvailability}
-     *      to get the base code for the era type, or getBaseEraAvailability to get the base code.
-     */
-    @Deprecated
-    public int getAvailability(int era) {
-        return calcEraAvailability(era);
-    }
-
-    /**
-     * @deprecated Use {@link #getYearAvailabilityName(int, boolean) getYearAvailabilityName}
-     *      to get availability for IS or Clan in a specific year,
-     *      or {@link #getEraAvailabilityName(int) getEraAvailabilityName to get code(s) for the era.
-     */
-    @Deprecated
-    public String getAvailabilityName(int era) {
-        return getEraAvailabilityName(era);
-    }
-
     @Override
     public boolean isClan() {
         return techAdvancement.getTechBase() == TECH_BASE_CLAN;
@@ -1180,7 +1156,7 @@ public class EquipmentType implements ITechnology {
         }
 
     }
-    
+
     @Override
     public int getIntroductionDate(boolean clan) {
         return techAdvancement.getIntroductionDate(clan);
@@ -1443,20 +1419,8 @@ public class EquipmentType implements ITechnology {
         return "EquipmentType: " + name;
     }
 
-    protected static GameOptions getGameOptions() {
-        if (Server.getServerInstance() == null) {
-            return null;
-        } else if (Server.getServerInstance().getGame() == null) {
-            return null;
-        }
-        return Server.getServerInstance().getGame().getOptions();
-    }
-
     public String getShortName() {
-        if (shortName.isBlank()) {
-            return getName();
-        }
-        return shortName;
+        return shortName.isBlank() ? getName() : shortName;
     }
 
     public String getShortName(double size) {
@@ -1521,5 +1485,39 @@ public class EquipmentType implements ITechnology {
      */
     public String getSortingName() {
         return (sortingName != null) ? sortingName : name;
+    }
+
+    /**
+     * Returns true if this equipment is any of those identified by the given type Strings. The
+     * given typeInternalNames are compared to the internal name of this EquipmentType, not the (display) name!
+     * Best use the constants defined in EquipmentTypeLookup.
+     *
+     * @param typeInternalName An Equipment internal name to check
+     * @param typeInternalNames More Equipment internal names to check
+     * @return true if the internalName of this equipment matches any of the given types
+     */
+    public boolean isAnyOf(String typeInternalName, String... typeInternalNames) {
+        return internalName.equals(typeInternalName) || Arrays.asList(typeInternalNames).contains(internalName);
+    }
+
+    /**
+     * Returns true if this equipment is that identified by the given typeInternalName String. The
+     * given typeInternalName is compared to the internal name of this EquipmentType, not the (display) name!
+     * Best use the constants defined in EquipmentTypeLookup. Calling this is equivalent to
+     * {@link #isAnyOf(String, String...)} with only the one parameter.
+     *
+     * @param typeInternalName An Equipment internal name to check
+     * @return true if the internalName of this equipment matches the given type
+     */
+    public boolean is(String typeInternalName) {
+        return isAnyOf(typeInternalName);
+    }
+
+    public static List<String> getStructureNames() {
+        return Arrays.stream(structureNames).collect(Collectors.toList());
+    }
+
+    public static List<String> getArmorNames() {
+        return Arrays.stream(armorNames).collect(Collectors.toList());
     }
 }

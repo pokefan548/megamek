@@ -14,12 +14,20 @@
  */
 package megamek.common;
 
+import megamek.client.ui.swing.GUIPreferences;
+import megamek.client.ui.swing.util.UIUtil;
 import org.apache.logging.log4j.LogManager;
 
+import javax.swing.*;
+import javax.swing.text.html.HTMLEditorKit;
+import javax.swing.text.html.StyleSheet;
+import java.awt.*;
 import java.io.Serializable;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
+
+import static megamek.client.ui.swing.util.UIUtil.uiGray;
 
 /**
  * This class defines a single server report. It holds information such as the
@@ -27,7 +35,7 @@ import java.util.Vector;
  * formatting information.
  * <p>
  * Typically, the report will be created by the relevant section in the
- * <code>Server</code>, and added to the phase report vector. The actual text
+ * <code>Server</code>, and added to the phase {@link Report} <code>Vector</code>. The actual text
  * of the report must also be added to the <i>report-messages.properties</i>
  * file.
  * <p>
@@ -57,7 +65,6 @@ import java.util.Vector;
  * <p> " Crusader (Bob) does 6 damage to the tank."
  *
  * @author Ryan McConnell (oscarmm)
- * @version $Revision$
  * @since 0.30
  */
 public class Report implements Serializable {
@@ -214,8 +221,7 @@ public class Report implements Serializable {
         tagTranslate = r.tagTranslate;
         type = r.type;
         subject = r.subject;
-        obscuredIndexes = (Hashtable<Integer, Boolean>) r.obscuredIndexes
-                .clone();
+        obscuredIndexes = (Hashtable<Integer, Boolean>) r.obscuredIndexes.clone();
         obscuredRecipients = (Vector<String>) r.obscuredRecipients.clone();
         tagCounter = r.tagCounter;
     }
@@ -311,9 +317,9 @@ public class Report implements Serializable {
 
     /**
      * Indicate which of two possible messages should be substituted for the
-     * <code>&lt;msg:<i>n</i>,<i>m</i>&gt; tag.  An argument of
+     * <code>&lt;msg:<i>n</i>,<i>m</i>&gt;</code> tag. An argument of
      * <code>true</code> would select message <i>n</i> while an
-     * argument of <code>false</code> would select <i>m</i>.  In the
+     * argument of <code>false</code> would select <i>m</i>. In the
      * future, this capability may be expanded to support more than
      * two choices.
      *
@@ -335,10 +341,19 @@ public class Report implements Serializable {
             if ((indentation <= Report.DEFAULT_INDENTATION) || showImage) {
                 imageCode = "<span id='" + entity.getId() + "'></span>";
             }
-            add("<font color='0xffffff'><a href=\"" + ENTITY_LINK + entity.getId()
-                    + "\">" + entity.getShortName() + "</a></font>", true);
-            add("<B><font color='" + entity.getOwner().getColour().getHexString(0x00F0F0F0) + "'>"
-                    + entity.getOwner().getName() + "</font></B>");
+
+            Player owner = entity.getOwner();
+            Color ownerColor = (owner != null) ? owner.getColour().getColour() : uiGray();
+            String ownerName = (owner != null) ? owner.getName() : ReportMessages.getString("report.unknownOwner");
+
+            String unitName = href(ENTITY_LINK + entity.getId(), entity.getShortName());
+
+            if ((entity.getCrew().getSize() >= 1) && !entity.getCrew().getNickname().isBlank()) {
+                unitName += fgColor(ownerColor, ' ' + entity.getCrew().getNickname().toUpperCase());
+            }
+
+            add(unitName, true);
+            add(bold(fgColor(ownerColor, ownerName)));
         }
     }
 
@@ -422,12 +437,10 @@ public class Report implements Serializable {
             }
             return value;
         } catch (ArrayIndexOutOfBoundsException e) {
-            System.out.println("Error: Report#getText --> Array Index out of "
-                    + "Bounds Exception (index: " + index
-                    + ") for a report with ID " + messageId
-                    + ".  Maybe Report#add wasn't called enough "
-                    + "times for the amount of tags in the message?");
-            return "[Reporting Error: see megameklog.txt for details]";
+            LogManager.getLogger().error("Error: Report#getText --> Array Index out of Bounds Exception (index: "
+                    + index + ") for a report with ID " + messageId
+                    + ". Maybe Report#add wasn't called enough times for the amount of tags in the message?");
+            return "[Reporting Error: see megamek.log for details]";
         }
     }
 
@@ -446,10 +459,8 @@ public class Report implements Serializable {
 
         if (raw == null) {
             // Should we handle this better? Check alternate language files?
-            System.out.println("Error: No message found for ID "
-                    + messageId);
-            text.append("[Reporting Error for message ID ").append(
-                    messageId).append("]");
+            LogManager.getLogger().error("No message found for ID " + messageId);
+            text.append("[Reporting Error for message ID ").append(messageId).append("]");
         } else {
             int i = 0;
             int mark = 0;
@@ -554,6 +565,59 @@ public class Report implements Serializable {
         } catch (Exception ex) {
             LogManager.getLogger().error("Cannot add a new line", ex);
         }
+    }
+
+    public static void setupStylesheet(JTextPane pane) {
+        pane.setContentType("text/html");
+        StyleSheet styleSheet = ((HTMLEditorKit) pane.getEditorKit()).getStyleSheet();
+        Report.setupStylesheet(styleSheet);
+    }
+
+    public static void setupStylesheet(StyleSheet styleSheet) {
+        Font font = UIManager.getFont("Label.font");
+        int size = UIUtil.scaleForGUI(UIUtil.FONT_SCALE1);
+
+        GUIPreferences guip = GUIPreferences.getInstance();
+        styleSheet.addRule(
+                "pre { font-family: " + font.getFamily() + "; font-size: " + size + "pt; font-style:normal;}");
+        styleSheet.addRule("a { color: " + hexColor(guip.getReportLinkColor()) + " }");
+        styleSheet.addRule("span.warning { color: " + hexColor(guip.getWarningColor()) + " }");
+    }
+
+    public String span(String name, String text) {
+        return "<span class='" + name + "'>" + text + "</span>";
+    }
+
+    public String warning(String text) {
+        return span("warning", text);
+    }
+
+    private static String hexColor(Color color) {
+        return String.format("#%06x", Integer.valueOf(color.getRGB() & 0x00FFFFFF));
+    }
+
+    public String fgColor(Color color, String str) {
+        return fgColor(hexColor(color), str);
+    }
+
+    public String fgColor(String hexColor, String str) {
+        return "<span style='color:" + hexColor + "'>" + str + "</span>";
+    }
+
+    public String bgColor(Color color, String str) {
+        return bgColor(hexColor(color), str);
+    }
+
+    public String bgColor(String hexColor, String str) {
+        return "<span style='background-color:"+ hexColor +"'>" + str + "</span>";
+    }
+
+    public static String bold(String str) {
+        return "<B>" + str + "</B>";
+    }
+
+    public String href(String href, String str) {
+        return "<a href='" + href + "'>" + str + "</a>";
     }
 
     /**

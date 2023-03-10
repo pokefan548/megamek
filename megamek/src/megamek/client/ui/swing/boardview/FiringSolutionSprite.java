@@ -64,10 +64,13 @@ class FiringSolutionSprite extends HexSprite {
         // modifier
         int thm = fsoln.getToHitData().getValue();
         toHitMod = Integer.toString(thm);
-        if (thm >= 0) toHitMod = "+" + toHitMod;
-        if ((thm == TargetRoll.IMPOSSIBLE)
-                || (thm == TargetRoll.AUTOMATIC_FAIL)) 
+        if (thm >= 0) {
+            toHitMod = "+" + toHitMod;
+        }
+
+        if ((thm == TargetRoll.IMPOSSIBLE) || (thm == TargetRoll.AUTOMATIC_FAIL)) {
             noHitPossible = true;
+        }
         
         // range
         int r = fsoln.getToHitData().getRange();
@@ -94,18 +97,15 @@ class FiringSolutionSprite extends HexSprite {
         graph.scale(bv.scale, bv.scale);
         
         // get the right font
-        String fontName = GUIPreferences.getInstance().getString(
-                GUIPreferences.ADVANCED_MOVE_FONT_TYPE);
-        int fontStyle = GUIPreferences.getInstance().getInt(
-                GUIPreferences.ADVANCED_MOVE_FONT_STYLE);
+        String fontName = GUIPreferences.getInstance().getString(GUIPreferences.ADVANCED_MOVE_FONT_TYPE);
+        int fontStyle = GUIPreferences.getInstance().getInt(GUIPreferences.ADVANCED_MOVE_FONT_STYLE);
         
         if (noHitPossible) {  
             // write big red X
             graph.setFont(new Font(fontName, fontStyle, fontSizeLarge));
             if (bv.scale > 0.7) {
                 // better translucent, the X is so big
-                bv.drawOutlineText(graph, "X", centerHex, 
-                        fontSizeLarge, xColor, true, Color.BLACK);
+                bv.drawOutlineText(graph, "X", centerHex, fontSizeLarge, xColor, true, Color.BLACK);
             } else {
                 // better readable at small scale
                 bv.drawCenteredText(graph, "X", centerHex, xColor, false);

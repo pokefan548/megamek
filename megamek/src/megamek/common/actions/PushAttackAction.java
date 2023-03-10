@@ -38,7 +38,7 @@ public class PushAttackAction extends DisplacementAttackAction {
      * pushes are impossible when physical attacks are impossible, or a
      * retractable blade is extended
      *
-     * @param game
+     * @param game The current {@link Game}
      * @param ae
      * @param target
      * @return
@@ -86,7 +86,7 @@ public class PushAttackAction extends DisplacementAttackAction {
         Entity te = null;
         if (target.getTargetType() == Targetable.TYPE_ENTITY) {
             te = (Entity) target;
-            targetId = target.getTargetId();
+            targetId = target.getId();
         }
 
         if (ae == null) {
@@ -194,7 +194,7 @@ public class PushAttackAction extends DisplacementAttackAction {
 
         // can't do anything but counter-push if the target of another attack
         if (ae.isTargetOfDisplacementAttack()
-                && (ae.findTargetedDisplacement().getEntityId() != target.getTargetId())) {
+                && (ae.findTargetedDisplacement().getEntityId() != target.getId())) {
             return new ToHitData(TargetRoll.IMPOSSIBLE, "Attacker is the target of another push/charge/DFA");
         }
 

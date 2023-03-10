@@ -13,6 +13,8 @@
  */
 package megamek.common;
 
+import megamek.common.annotations.Nullable;
+
 import java.io.Serializable;
 import java.util.List;
 
@@ -43,10 +45,8 @@ public interface Transporter extends Serializable {
     /**
      * Load the given unit.
      *
-     * @param unit - the <code>Entity</code> to be loaded.
-     * @exception - If the unit can't be loaded, an
-     *                <code>IllegalArgumentException</code> exception will be
-     *                thrown.
+     * @param unit the <code>Entity</code> to be loaded.
+     * @throws IllegalArgumentException If the unit can't be loaded
      */
     void load(Entity unit) throws IllegalArgumentException;
 
@@ -56,8 +56,8 @@ public interface Transporter extends Serializable {
      *
      * @return A <code>List</code> of loaded <code>Entity</code> units.
      *         This list will never be <code>null</code>, but it may be
-     *         empty. The returned <code>List</code> is independant from the
-     *         under- lying data structure; modifying one does not affect the
+     *         empty. The returned <code>List</code> is independent from the
+     *         underlying data structure; modifying one does not affect the
      *         other.
      */
     List<Entity> getLoadedUnits();
@@ -72,9 +72,7 @@ public interface Transporter extends Serializable {
     boolean unload(Entity unit);
 
     /**
-     * Returns the number of unused spaces in this transporter.
-     *
-     * @return
+     * @return the number of unused spaces in this transporter.
      */
     double getUnused();
 
@@ -112,7 +110,7 @@ public interface Transporter extends Serializable {
      *         that location. This value will be <code>null</code> if no unit
      *         is transported on the outside at that location.
      */
-    Entity getExteriorUnitAt(int loc, boolean isRear);
+    @Nullable Entity getExteriorUnitAt(int loc, boolean isRear);
 
     /**
      * @return list of all units carried externally by this transporter
@@ -132,7 +130,12 @@ public interface Transporter extends Serializable {
     void resetTransporter();
     
     /**
-     * @return THe number of docking hardpoints this transporter counts as toward the limit.
+     * Returns the number of Docking Collars (hardpoints) this transporter counts as toward
+     * the maximum that a JumpShip (or WS, SS) may carry. TO:AUE p.146
+     *
+     * @return The number of docking hardpoints this transporter counts as toward the limit.
      */
-    int hardpointCost();
+    default int hardpointCost() {
+        return 0;
+    }
 }

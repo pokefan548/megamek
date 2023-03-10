@@ -23,10 +23,9 @@ import megamek.client.Client;
 import megamek.client.event.BoardViewEvent;
 import megamek.client.ui.Messages;
 import megamek.client.ui.SharedUtility;
+import megamek.client.ui.swing.util.KeyCommandBind;
 import megamek.client.ui.swing.widget.MegamekButton;
-import megamek.client.ui.swing.widget.SkinSpecification;
 import megamek.common.*;
-import megamek.common.enums.GamePhase;
 import megamek.common.event.GamePhaseChangeEvent;
 import megamek.common.event.GameTurnChangeEvent;
 import megamek.common.options.OptionsConstants;
@@ -37,6 +36,9 @@ import java.awt.event.ActionEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.util.*;
+
+import static megamek.client.ui.swing.util.UIUtil.guiScaledFontHTML;
+import static megamek.client.ui.swing.util.UIUtil.uiLightViolet;
 
 public class DeploymentDisplay extends StatusBarPhaseDisplay {
 
@@ -85,6 +87,24 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
         public String toString() {
             return Messages.getString("DeploymentDisplay." + getCmd());
         }
+
+        public String getHotKeyDesc() {
+            String result = "";
+
+            String msg_next= Messages.getString("Next");
+            String msg_previous = Messages.getString("Previous");
+
+            switch (this) {
+                case DEPLOY_NEXT:
+                    result += "&nbsp;&nbsp;" + msg_next + ": " + KeyCommandBind.getDesc(KeyCommandBind.NEXT_UNIT);
+                    result += "&nbsp;&nbsp;" + msg_previous + ": " + KeyCommandBind.getDesc(KeyCommandBind.PREV_UNIT);
+                    break;
+                default:
+                    break;
+            }
+
+            return result;
+        }
     }
 
     protected Map<DeployCommand,MegamekButton> buttons;
@@ -94,31 +114,39 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
     private boolean turnMode = false;
     private boolean assaultDropPreference = false;
 
+    private static final GUIPreferences GUIP = GUIPreferences.getInstance();
+
     /** Creates and lays out a new deployment phase display for the specified client. */
     public DeploymentDisplay(ClientGUI clientgui) {      
         super(clientgui);
         clientgui.getClient().getGame().addGameListener(this);
         clientgui.getBoardView().addBoardViewListener(this);
-        setupStatusBar(Messages.getString("DeploymentDisplay.waitingForDeploymentPhase")); 
-        
+        setupStatusBar(Messages.getString("DeploymentDisplay.waitingForDeploymentPhase"));
+
+        setButtons();
+        setButtonsTooltips();
+
+        butDone.setText("<html><body>" + Messages.getString("DeploymentDisplay.Deploy") + "</body></html>");
+        String f = guiScaledFontHTML(uiLightViolet()) +  KeyCommandBind.getDesc(KeyCommandBind.DONE)+ "</FONT>";
+        butDone.setToolTipText("<html><body>" + f + "</body></html>");
+        butDone.setEnabled(false);
+        setupButtonPanel();
+    }
+
+    @Override
+    protected void setButtons() {
         buttons = new HashMap<>((int) (DeployCommand.values().length * 1.25 + 0.5));
         for (DeployCommand cmd : DeployCommand.values()) {
-            String title = Messages.getString("DeploymentDisplay." + cmd.getCmd());
-            MegamekButton newButton = new MegamekButton(title, SkinSpecification.UIComponents.PhaseDisplayButton.getComp());
-            String ttKey = "DeploymentDisplay." + cmd.getCmd() + ".tooltip";
-            if (Messages.keyExists(ttKey)) {
-                newButton.setToolTipText(Messages.getString(ttKey));
-            }
-            newButton.addActionListener(this);
-            newButton.setActionCommand(cmd.getCmd());
-            newButton.setEnabled(false);
-            buttons.put(cmd, newButton);
-        }          
+            buttons.put(cmd, createButton(cmd.getCmd(), "DeploymentDisplay."));
+        }
         numButtonGroups = (int) Math.ceil((buttons.size() + 0.0) / buttonsPerGroup);
-
-        butDone.setText("<html><b>" + Messages.getString("DeploymentDisplay.Deploy") + "</b></html>");
-        butDone.setEnabled(false);
-        setupButtonPanel();        
+    }
+    @Override
+    protected void setButtonsTooltips() {
+        for (DeployCommand cmd : DeployCommand.values()) {
+            String tt = createToolTip(cmd.getCmd(), "DeploymentDisplay.", cmd.getHotKeyDesc());
+            buttons.get(cmd).setToolTipText(tt);
+        }
     }
     
     @Override
@@ -198,14 +226,14 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
                 assaultDropPreference = false;
             }
             
-            setLoadEnabled(getLoadableEntities().size() > 0);
-            setUnloadEnabled(ce().getLoadedUnits().size() > 0);
+            setLoadEnabled(!getLoadableEntities().isEmpty());
+            setUnloadEnabled(!ce().getLoadedUnits().isEmpty());
             
             setNextEnabled(true);
             setRemoveEnabled(true);
 
-            clientgui.mechD.displayEntity(ce());
-            clientgui.mechD.showPanel("movement"); 
+            clientgui.getUnitDisplay().displayEntity(ce());
+            clientgui.getUnitDisplay().showPanel("movement");
         } else {
             disableButtons();
             setNextEnabled(true);
@@ -225,11 +253,9 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
     private void endMyTurn() {
         final Game game = clientgui.getClient().getGame();
         Entity next = game.getNextEntity(game.getTurnIndex());
-        if ((GamePhase.DEPLOYMENT == game.getPhase())
-                && (null != next)
-                && (null != ce())
+        if (game.getPhase().isDeployment() && (null != next) && (null != ce())
                 && (next.getOwnerId() != ce().getOwnerId())) {
-            clientgui.setUnitDisplayVisible(false);
+            clientgui.maybeShowUnitDisplay();
         }
         cen = Entity.NONE;
         clientgui.getBoardView().select(null);
@@ -288,12 +314,12 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
 
         // Check nag for doomed planetary conditions
         String reason = game.getPlanetaryConditions().whyDoomed(en, game);
-        if ((reason != null) && GUIPreferences.getInstance().getNagForDoomed()) {
+        if ((reason != null) && GUIP.getNagForDoomed()) {
             String title = Messages.getString("DeploymentDisplay.ConfirmDoomed.title"); 
             String body = Messages.getString("DeploymentDisplay.ConfirmDoomed.message", new Object[] {reason}); 
             ConfirmDialog response = clientgui.doYesNoBotherDialog(title, body);
             if (!response.getShowAgain()) {
-                GUIPreferences.getInstance().setNagForDoomed(false);
+                GUIP.setNagForDoomed(false);
             }
             if (!response.getAnswer()) {
                 return;
@@ -362,7 +388,7 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
         }
         
         final Game game = clientgui.getClient().getGame();
-        // On simultaneous phases, each player ending their turn will generalte a turn change
+        // On simultaneous phases, each player ending their turn will generate a turn change
         // We want to ignore turns from other players and only listen to events we generated
         // Except on the first turn
         if (game.getPhase().isSimultaneous(game)
@@ -370,25 +396,32 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
                 && (game.getTurnIndex() != 0)) {
             return;
         }
-        if (game.getPhase() != GamePhase.DEPLOYMENT) {
+
+        if (!game.getPhase().isDeployment()) {
             // ignore
             return;
         }
+
+        String s = getRemainingPlayerWithTurns();
         
         if (clientgui.getClient().isMyTurn()) {
             if (cen == Entity.NONE) {
                 beginMyTurn();
+                clientgui.bingMyTurn();
             }
-            setStatusBarText(Messages.getString("DeploymentDisplay.its_your_turn")); 
+            setStatusBarText(Messages.getString("DeploymentDisplay.its_your_turn") + s);
         } else {
             endMyTurn();
             String playerName;
+          
             if (e.getPlayer() != null) {
                 playerName = e.getPlayer().getName();
             } else {
                 playerName = "Unknown";
             }
-            setStatusBarText(Messages.getString("DeploymentDisplay.its_others_turn", playerName));
+
+            setStatusBarText(Messages.getString("DeploymentDisplay.its_others_turn", playerName) + s);
+            clientgui.bingOthersTurn();
         }
         
     }
@@ -398,14 +431,15 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
         clientgui.getBoardView().markDeploymentHexesFor(null);
         
        // In case of a /reset command, ensure the state gets reset
-        if (clientgui.getClient().getGame().getPhase() == GamePhase.LOUNGE) {
+        if (clientgui.getClient().getGame().getPhase().isLounge()) {
             endMyTurn();
         }
         // Are we ignoring events?
         if (isIgnoringEvents()) {
             return;
         }
-        if (clientgui.getClient().getGame().getPhase() == GamePhase.DEPLOYMENT) {
+
+        if (clientgui.getClient().getGame().getPhase().isDeployment()) {
             setStatusBarText(Messages.getString("DeploymentDisplay.waitingForDeploymentPhase")); 
         }
     }
@@ -463,7 +497,7 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
             msg = Messages.getString("DeploymentDisplay.wrongMapType", ce().getShortName(), Board.getTypeName(board.getType())); 
             JOptionPane.showMessageDialog(clientgui, msg, title, JOptionPane.WARNING_MESSAGE);
             return;
-        } else if (!(board.isLegalDeployment(moveto, ce().getStartingPos()) || assaultDropPreference)
+        } else if (!(board.isLegalDeployment(moveto, ce()) || assaultDropPreference)
                 || (ce().isLocationProhibited(moveto) && !isTankOnPavement)) {
             msg = Messages.getString("DeploymentDisplay.cantDeployInto", ce().getShortName(), moveto.getBoardNum());
             title = Messages.getString("DeploymentDisplay.alertDialog.title"); 
@@ -616,16 +650,16 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
     // ActionListener
     //
     @Override
-    public void actionPerformed(ActionEvent ev) {
+    public void actionPerformed(ActionEvent evt) {
         final Client client = clientgui.getClient();
-        final String actionCmd = ev.getActionCommand();
+        final String actionCmd = evt.getActionCommand();
         // Are we ignoring events?
         if (isIgnoringEvents()) {
             return;
         }
+
         if (!client.isMyTurn()) {
-            // odd...
-            return;
+
         } else if (actionCmd.equals(DeployCommand.DEPLOY_NEXT.getCmd())) {
             if (ce() != null) {
                 ce().setPosition(null);
@@ -649,12 +683,12 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
             List<Entity> choices = getLoadableEntities();
 
             // Do we have anyone to load?
-            if (choices.size() > 0) {
+            if (!choices.isEmpty()) {
                 String input = (String) JOptionPane.showInputDialog(clientgui,
-                                Messages.getString("DeploymentDisplay.loadUnitDialog.message", ce().getShortName(), ce().getUnusedString()), 
-                                Messages.getString("DeploymentDisplay.loadUnitDialog.title"), 
-                                JOptionPane.QUESTION_MESSAGE, null,
-                                SharedUtility.getDisplayArray(choices), null);
+                        Messages.getString("DeploymentDisplay.loadUnitDialog.message", ce().getShortName(), ce().getUnusedString()),
+                        Messages.getString("DeploymentDisplay.loadUnitDialog.title"),
+                        JOptionPane.QUESTION_MESSAGE, null,
+                        SharedUtility.getDisplayArray(choices), null);
                 Entity other = (Entity) SharedUtility.getTargetPicked(choices, input);
                 if (!(other instanceof Infantry)) {
                     List<Integer> bayChoices = new ArrayList<>();
@@ -673,7 +707,7 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
                         String title = Messages.getString("DeploymentDisplay.loadUnitBayNumberDialog.title"); 
                         String msg = Messages.getString("DeploymentDisplay.loadUnitBayNumberDialog.message", ce().getShortName());
                         String bayString = (String) JOptionPane.showInputDialog(clientgui, msg, title,
-                                        JOptionPane.QUESTION_MESSAGE, null, retVal, null);
+                                JOptionPane.QUESTION_MESSAGE, null, retVal, null);
                         int bayNum = Integer.parseInt(bayString.substring(0, bayString.indexOf(" ")));
                         other.setTargetBay(bayNum);
                         // We need to update the entity here so that the server knows about our target bay
@@ -691,54 +725,51 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
                             for (Integer bn : bayChoices) {
                                 retVal[i++] = bn > 0 ?
                                         Messages.getString("MovementDisplay.loadProtoClampMountDialog.rear") :
-                                            Messages.getString("MovementDisplay.loadProtoClampMountDialog.front");
+                                        Messages.getString("MovementDisplay.loadProtoClampMountDialog.front");
                             }
                             String bayString = (String) JOptionPane.showInputDialog(clientgui,
-                                            Messages.getString("MovementDisplay.loadProtoClampMountDialog.message", ce().getShortName()), 
-                                            Messages.getString("MovementDisplay.loadProtoClampMountDialog.title"), 
-                                            JOptionPane.QUESTION_MESSAGE, null, retVal, null);
+                                    Messages.getString("MovementDisplay.loadProtoClampMountDialog.message", ce().getShortName()),
+                                    Messages.getString("MovementDisplay.loadProtoClampMountDialog.title"),
+                                    JOptionPane.QUESTION_MESSAGE, null, retVal, null);
                             other.setTargetBay(bayString.equals(Messages.getString("MovementDisplay.loadProtoClampMountDialog.front")) ? 0 : 1);
                             // We need to update the entity here so that the server knows about our target bay
                             clientgui.getClient().sendUpdateEntity(other);
                         } else {
                             other.setTargetBay(-1); // Safety set!
                         }
-                    } else if (other != null) {
+                    } else {
                         other.setTargetBay(-1); // Safety set!
                     }
-                } else if (other != null) {
+                } else {
                     other.setTargetBay(-1); // Safety set!
                 }
-                if (other != null) {
-                    // Please note, the Server may never get this load order.
-                    ce().load(other, false, other.getTargetBay());
-                    other.setTransportId(cen);
-                    clientgui.mechD.displayEntity(ce());
-                    setUnloadEnabled(true);
-                }
-            } else { // End have-choices
+
+                // Please note, the Server may never get this load order.
+                ce().load(other, false, other.getTargetBay());
+                other.setTransportId(cen);
+                clientgui.getUnitDisplay().displayEntity(ce());
+                setUnloadEnabled(true);
+            } else {
                 JOptionPane.showMessageDialog(clientgui.frame, 
                         Messages.getString("DeploymentDisplay.alertDialog1.message", ce().getShortName()), 
                         Messages.getString("DeploymentDisplay.alertDialog1.title"), 
                         JOptionPane.ERROR_MESSAGE);
             }
-        } // End load-unit
-        else if (actionCmd.equals(DeployCommand.DEPLOY_UNLOAD.getCmd())) {
+        } else if (actionCmd.equals(DeployCommand.DEPLOY_UNLOAD.getCmd())) {
             // Do we have anyone to unload?
             Entity loader = ce();
             List<Entity> choices = loader.getLoadedUnits();
-            if (choices.size() > 0) {
-                Entity loaded = null;
+            if (!choices.isEmpty()) {
                 String msg = Messages.getString("DeploymentDisplay.unloadUnitDialog.message", ce().getShortName(), ce().getUnusedString());
                 String title = Messages.getString("DeploymentDisplay.unloadUnitDialog.title"); 
                 String input = (String) JOptionPane.showInputDialog(clientgui, msg, title, JOptionPane.QUESTION_MESSAGE, null,
                         SharedUtility.getDisplayArray(choices), null);
-                loaded = (Entity) SharedUtility.getTargetPicked(choices, input);
+                Entity loaded = (Entity) SharedUtility.getTargetPicked(choices, input);
                 if (loaded != null) {
                     if (loader.unload(loaded)) {
                         loaded.setTransportId(Entity.NONE);
                         loaded.newRound(clientgui.getClient().getGame().getRoundCount());
-                        clientgui.mechD.displayEntity(ce());
+                        clientgui.getUnitDisplay().displayEntity(ce());
                         // Unit loaded in the lobby?  Server needs updating
                         if (loader.getLoadedKeepers().contains(loaded.getId())) {
                             Vector<Integer> lobbyLoaded = loader.getLoadedKeepers();
@@ -748,20 +779,18 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
                             // Need to take turn for unloaded unit, so select it
                             selectEntity(loaded.getId());
                         }
-                        setLoadEnabled(getLoadableEntities().size() > 0);
+                        setLoadEnabled(!getLoadableEntities().isEmpty());
                     } else {
                         LogManager.getLogger().error("Could not unload " + loaded.getShortName() + " from " + ce().getShortName()); 
                     }
                 }
-            } // End have-choices
-            else {
+            } else {
                 JOptionPane.showMessageDialog(clientgui.frame,
                         Messages.getString("DeploymentDisplay.alertDialog2.message", ce().getShortName()),
                         Messages.getString("DeploymentDisplay.alertDialog2.title"),
                         JOptionPane.ERROR_MESSAGE);
             }
-        } // End unload-unit
-        else if (actionCmd.equals(DeployCommand.DEPLOY_REMOVE.getCmd())) {
+        } else if (actionCmd.equals(DeployCommand.DEPLOY_REMOVE.getCmd())) {
             if (JOptionPane.showConfirmDialog(clientgui.frame, 
                     Messages.getString("DeploymentDisplay.removeUnit", ce().getShortName()), 
                     Messages.getString("DeploymentDisplay.removeTitle"),
@@ -833,7 +862,7 @@ public class DeploymentDisplay extends StatusBarPhaseDisplay {
             }
         } else {
             clientgui.maybeShowUnitDisplay();
-            clientgui.mechD.displayEntity(e);
+            clientgui.getUnitDisplay().displayEntity(e);
             if (e.isDeployed()) {
                 clientgui.getBoardView().centerOnHex(e.getPosition());
             }

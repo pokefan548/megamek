@@ -14,13 +14,13 @@
  */
 package megamek.common.verifier;
 
-import java.math.BigInteger;
-import java.util.*;
-
 import megamek.common.*;
 import megamek.common.util.StringUtil;
 import megamek.common.weapons.bayweapons.BayWeapon;
 import megamek.common.weapons.capitalweapons.ScreenLauncherWeapon;
+
+import java.math.BigInteger;
+import java.util.*;
 
 /**
  * Validation and construction data for advanced aerospace units (jumpships, warships, space stations)
@@ -771,7 +771,7 @@ public class TestAdvancedAerospace extends TestAero {
         // Make sure all bays have at least one weapon and that there are at least
         // ten shots of ammo for each ammo-using weapon in the bay.
         for (Mounted bay : vessel.getWeaponBayList()) {
-            if (bay.getBayWeapons().size() == 0) {
+            if (bay.getBayWeapons().isEmpty()) {
                 buff.append("Bay ").append(bay.getName()).append(" has no weapons\n");
                 illegal = true;
             }

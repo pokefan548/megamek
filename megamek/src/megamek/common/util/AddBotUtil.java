@@ -19,11 +19,15 @@ import megamek.client.bot.princess.BehaviorSettings;
 import megamek.client.bot.princess.BehaviorSettingsFactory;
 import megamek.client.bot.princess.Princess;
 import megamek.client.bot.ui.swing.BotGUI;
+import megamek.codeUtilities.StringUtility;
 import megamek.common.Game;
 import megamek.common.Player;
 import megamek.common.annotations.Nullable;
 
+import javax.swing.*;
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 
 /**
  * @author Deric "Netzilla" Page (deric dot page at usa dot net)
@@ -103,7 +107,7 @@ public class AddBotUtil {
             }
         }
 
-        if (StringUtil.isNullOrEmpty(playerName)) {
+        if (StringUtility.isNullOrBlank(playerName)) {
             String argLine = fullLine.toString();
             argLine = argLine.replaceFirst("/replacePlayer", "");
             argLine = argLine.replaceFirst("-b:" + botName, "");
@@ -133,7 +137,7 @@ public class AddBotUtil {
         final BotClient botClient;
         if ("Princess".equalsIgnoreCase(botName.toString())) {
             botClient = makeNewPrincessClient(target, host, port);
-            if (!StringUtil.isNullOrEmpty(configName)) {
+            if (!StringUtility.isNullOrBlank(configName)) {
                 final BehaviorSettings behavior = BehaviorSettingsFactory.getInstance()
                         .getBehavior(configName.toString());
                 if (null != behavior) {
@@ -152,7 +156,11 @@ public class AddBotUtil {
             botName = new StringBuilder("TestBot");
             botClient = makeNewTestBotClient(target, host, port);
         }
-        botClient.getGame().addGameListener(new BotGUI(botClient));
+
+        if (!GraphicsEnvironment.isHeadless()) {
+            // FIXME : I should be able to access the JFrame by proper ways
+            botClient.getGame().addGameListener(new BotGUI(new JFrame(), botClient));
+        }
         try {
             botClient.connect();
         } catch (final Exception e) {
@@ -189,7 +197,10 @@ public class AddBotUtil {
         final Player target = possible.get();
         final Princess princess = new Princess(target.getName(), host, port);
         princess.setBehaviorSettings(behavior);
-        princess.getGame().addGameListener(new BotGUI(princess));
+        if (!GraphicsEnvironment.isHeadless()) {
+            // FIXME : I should be able to use a frame through proper channels
+            princess.getGame().addGameListener(new BotGUI(new JFrame(), princess));
+        }
         try {
             princess.connect();
         } catch (final Exception e) {

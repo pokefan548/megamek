@@ -14,7 +14,6 @@
 package megamek.common;
 
 import megamek.client.ui.swing.util.PlayerColour;
-import megamek.common.enums.GamePhase;
 import megamek.common.event.GamePlayerChangeEvent;
 import megamek.common.icons.Camouflage;
 import megamek.common.options.OptionsConstants;
@@ -48,11 +47,15 @@ public final class Player extends TurnOrdered {
     private boolean ghost = false; // disconnected player
     private boolean bot = false;
     private boolean observer = false;
+    private boolean gameMaster = false;
 
-    private boolean seeEntireBoard = false; // Player can observe double blind games
+    private boolean seeAll = false; // Observer or Game Master can observe double-blind games
+    private boolean singleBlind = false; // Bot can observe double-blind games
 
-    // these are game-specific, and maybe should be separate from the player object
+    // deployment settings
     private int startingPos = Board.START_ANY;
+    private int startOffset = 0;
+    private int startWidth = 3;
 
     // number of minefields
     private int numMfConv = 0;
@@ -79,12 +82,10 @@ public final class Player extends TurnOrdered {
     private Vector<Minefield> visibleMinefields = new Vector<>();
 
     private boolean admitsDefeat = false;
-    
-    /**
-     * Boolean that keeps track of whether a player has accepted another 
-     * player's request to change teams.
-     */
-    private boolean allowingTeamChange = false;
+
+    //Voting should not be stored in save game so marked transient
+    private transient boolean votedToAllowTeamChange = false;
+    private transient boolean votedToAllowGameMaster = false;
     //endregion Variable Declarations
 
     //region Constructors
@@ -226,7 +227,7 @@ public final class Player extends TurnOrdered {
     }
 
     /**
-     * Specifies if this player connected as a bot.
+     * @return true if this player connected as a bot.
      */
     public boolean isBot() {
         return bot;
@@ -239,40 +240,116 @@ public final class Player extends TurnOrdered {
         this.bot = bot;
     }
 
+    /** @return true if this player may become a Game Master. Any human may be a GM*/
+    public boolean isGameMasterPermitted() {
+        return !bot;
+    }
+
+    /** @return true if {@link #gameMaster} flag is true and {@link #isGameMasterPermitted()}*/
+    public boolean isGameMaster() {
+        return (isGameMasterPermitted() && gameMaster);
+    }
+
+    /**
+     * If you are checking to see this player is a Game Master, use {@link #isGameMaster()} ()} instead
+     * @return the value of gameMaster flag, without checking if it is permitted.
+     */
+    public boolean getGameMaster() {
+        return gameMaster;
+    }
+
+    /**
+     * sets {@link #gameMaster} but this only allows GM status if other conditions permits it.
+     * see {@link #isGameMaster()}
+     */
+    public void setGameMaster(boolean gameMaster) {
+        this.gameMaster = gameMaster;
+    }
+
+    /** @return true if {@link #observer} flag is true and not in VICTORY phase*/
     public boolean isObserver() {
-        if ((game != null) && (game.getPhase() == GamePhase.VICTORY)) {
+        if ((game != null) && game.getPhase().isVictory()) {
             return false;
         }
         return observer;
     }
 
+    /**
+     *  sets {@link #seeAll}. This will only enable seeAll if other conditions allow it.
+     *  see {@link #canIgnoreDoubleBlind()}
+     */
     public void setSeeAll(boolean seeAll) {
-        seeEntireBoard = seeAll;
+        this.seeAll = seeAll;
     }
 
     /**
-     * This simply returns the value, without checking the observer flag
+     * If you are checking to see if double-blind applies to this player, use {@link #canIgnoreDoubleBlind()}
+     * @return the value of seeAll flag, without checking if it is permitted
      */
     public boolean getSeeAll() {
-        return seeEntireBoard;
+        return seeAll;
     }
 
     /**
-     * If observer is false, see_entire_board does nothing
+     * If you are checking to see if double-blind applies to this player, use {@link #canIgnoreDoubleBlind()}
+     * @return true if {@link #seeAll} is true and is permitted
      */
     public boolean canSeeAll() {
-        return (observer && seeEntireBoard);
+        return (isSeeAllPermitted() && seeAll);
     }
 
+    /**
+     * If you are checking to see if double-blind applies to this player, use {@link #canIgnoreDoubleBlind()}
+     * @return true if player is allowed use seeAll
+     * */
+    public boolean isSeeAllPermitted() {
+        return gameMaster || observer;
+    }
+
+    /** set the {@link #observer} flag. Observers have no units ad no team */
     public void setObserver(boolean observer) {
         this.observer = observer;
-        // If not an observer, clear the set see all flag
-        if (!observer) {
-            setSeeAll(false);
-        }
-        if (game != null && game.getTeamForPlayer(this) != null) {
-            game.getTeamForPlayer(this).cacheObserverStatus();
-        }
+    }
+
+    /**
+     *  sets {@link #seeAll}. This will only enable seeAll if other conditions allow it.
+     *  see {@link #canIgnoreDoubleBlind()}
+     */
+    public void setSingleBlind(boolean singleBlind) {
+        this.singleBlind = singleBlind;
+    }
+
+    /**
+     * If you are checking to see this player can ignore double-blind, use {@link #canIgnoreDoubleBlind()} ()} instead
+     * @return the value of singleBlind flag, without checking if it is permitted.
+     */
+    public boolean getSingleBlind() {
+        return singleBlind;
+    }
+
+    /**
+     * @return true if singleBlind flag is true and {@link #isSingleBlindPermitted()}
+     */
+    public boolean canSeeSingleBlind() {
+        return (isSingleBlindPermitted() && singleBlind);
+    }
+
+    /**
+     * If you are checking to see if double-blind applies to this player, use {@link #canIgnoreDoubleBlind()}
+     * @return true if player is allowed use singleblind (bots only)
+     * */
+    public boolean isSingleBlindPermitted() {
+        return bot;
+    }
+
+    /**
+     * Double-blind uses Line-of-sight to determine which units are displayed on the board
+     * and in reports. seeAll and singleBlind flags allow this to be ignored, granting a view
+     * of the entire map and units.
+     * @return true if this player ignores the double-blind setting.
+     */
+    public boolean canIgnoreDoubleBlind() {
+        return canSeeSingleBlind() || canSeeAll();
     }
 
     public PlayerColour getColour() {
@@ -289,6 +366,22 @@ public final class Player extends TurnOrdered {
 
     public void setStartingPos(int startingPos) {
         this.startingPos = startingPos;
+    }
+
+    public int getStartOffset() {
+        return startOffset;
+    }
+
+    public void setStartOffset(int startOffset) {
+        this.startOffset = startOffset;
+    }
+
+    public int getStartWidth() {
+        return startWidth;
+    }
+
+    public void setStartWidth(int startWidth) {
+        this.startWidth = startWidth;
     }
 
     /**
@@ -320,12 +413,20 @@ public final class Player extends TurnOrdered {
         return admitsDefeat;
     }
 
-    public void setAllowTeamChange(boolean allowChange) {
-        allowingTeamChange = allowChange;
+    public void setVotedToAllowTeamChange(boolean allowChange) {
+        votedToAllowTeamChange = allowChange;
     }
 
-    public boolean isAllowingTeamChange() {
-        return allowingTeamChange;
+    public boolean getVotedToAllowTeamChange() {
+        return votedToAllowTeamChange;
+    }
+
+    public void setVotedToAllowGameMaster(boolean allowChange) {
+        votedToAllowGameMaster = allowChange;
+    }
+
+    public boolean getVotedToAllowGameMaster() {
+        return votedToAllowGameMaster;
     }
 
     public void setArtyAutoHitHexes(Vector<Coords> artyAutoHitHexes) {
@@ -440,38 +541,25 @@ public final class Player extends TurnOrdered {
      * @return the bonus to this player's initiative rolls granted by his units
      */
     public int getTurnInitBonus() {
-        int bonusHQ = 0;
-        int bonusMD = 0;
-        int bonusQ = 0;
+        int bonus = 0;
         if (game == null) {
             return 0;
         }
         if (game.getEntitiesVector() == null) {
             return 0;
         }
+        
+        // per TacOps:AR page 162-163, only the highest bonus should available should be used.
         for (Entity entity : game.getEntitiesVector()) {
             if (entity.getOwner().equals(this)) {
-                if (game.getOptions().booleanOption(OptionsConstants.ADVANCED_TACOPS_MOBILE_HQS)
-                    && (bonusHQ == 0) && (entity.getHQIniBonus() > 0)) {
-                    bonusHQ = entity.getHQIniBonus();
+                if (game.getOptions().booleanOption(OptionsConstants.ADVANCED_TACOPS_MOBILE_HQS)) {
+                    bonus = Math.max(entity.getHQIniBonus(), bonus);
                 }
                 
-                /*
-                 * REMOVED IN IO.
-                 * if (game.getOptions().booleanOption(OptionsConstants.
-                 * RPG_MANEI_DOMINI) && (bonusMD == 0) &&
-                 * (entity.getMDIniBonus() > 0)) { bonusMD =
-                 * entity.getMDIniBonus(); }
-                 */
-                if (entity.getQuirkIniBonus() > bonusQ) {
-                    //TODO: I am assuming that the quirk initiative bonuses go to the highest,
-                    //rather than being cumulative
-                    //http://www.classicbattletech.com/forums/index.php/topic,52903.new.html#new
-                    bonusQ = entity.getQuirkIniBonus();
-                }
+                bonus = Math.max(bonus, entity.getQuirkIniBonus());
             }
         }
-        return bonusHQ + bonusMD + bonusQ;
+        return bonus;
     }
 
     /**
@@ -587,11 +675,16 @@ public final class Player extends TurnOrdered {
 
         copy.done = done;
         copy.ghost = ghost;
+        copy.bot = bot;
         copy.observer = observer;
+        copy.gameMaster = gameMaster;
 
-        copy.seeEntireBoard = seeEntireBoard;
+        copy.seeAll = seeAll;
+        copy.singleBlind = singleBlind;
 
         copy.startingPos = startingPos;
+        copy.startOffset = startOffset;
+        copy.startWidth = startWidth;
 
         copy.numMfConv = numMfConv;
         copy.numMfCmd = numMfCmd;

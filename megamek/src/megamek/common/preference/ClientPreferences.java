@@ -13,14 +13,15 @@
  */
 package megamek.common.preference;
 
+import megamek.MMConstants;
+import megamek.common.MovePath;
+import org.apache.logging.log4j.LogManager;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.util.Locale;
-
-import megamek.common.MovePath;
-import megamek.common.util.LocaleParser;
 
 public class ClientPreferences extends PreferenceStoreProxy {
     //region Variable Declarations
@@ -55,15 +56,17 @@ public class ClientPreferences extends PreferenceStoreProxy {
     public static final String BOARD_HEIGHT = "BoardHeight";
     public static final String MAP_WIDTH = "MapWidth";
     public static final String MAP_HEIGHT = "MapHeight";
+    public static final String REPORT_KEYWORDS = "ReportKeywords";
+    private static final String REPORTKEYWORDSDEFAULTS = "Needs\nRolls\nTakes\nHit\nFalls\nSkill Roll\nPilot Skill\nPhase\nDestroyed\nDamage";
     public static final String IP_ADDRESSES_IN_CHAT = "IPAddressesInChat";
     //endregion Variable Declarations
     
     //region Constructors
     public ClientPreferences(IPreferenceStore store) {
         this.store = store;
-        store.setDefault(LAST_CONNECT_ADDR, "localhost");
-        store.setDefault(LAST_CONNECT_PORT, 2346);
-        store.setDefault(LAST_SERVER_PORT, 2346);
+        store.setDefault(LAST_CONNECT_ADDR, MMConstants.LOCALHOST);
+        store.setDefault(LAST_CONNECT_PORT, MMConstants.DEFAULT_PORT);
+        store.setDefault(LAST_SERVER_PORT, MMConstants.DEFAULT_PORT);
         store.setDefault(MAP_TILESET, "saxarba.tileset");
         store.setDefault(MAX_PATHFINDER_TIME, MovePath.DEFAULT_PATHFINDER_TIME_LIMIT);
         store.setDefault(DATA_DIRECTORY, "data");
@@ -84,6 +87,7 @@ public class ClientPreferences extends PreferenceStoreProxy {
         store.setDefault(MAP_HEIGHT, 1);
         store.setDefault(DEBUG_OUTPUT_ON, false);
         store.setDefault(MEMORY_DUMP_ON, false);
+        store.setDefault(REPORT_KEYWORDS, REPORTKEYWORDSDEFAULTS);
         store.setDefault(IP_ADDRESSES_IN_CHAT, false);
         setLocale(store.getString(LOCALE));
         setMekHitLocLog();
@@ -281,6 +285,14 @@ public class ClientPreferences extends PreferenceStoreProxy {
         store.setValue(GUI_NAME, guiName);
     }
 
+    public String getReportKeywords() {
+        return store.getString(REPORT_KEYWORDS);
+    }
+
+    public void setReportKeywords(String s) {
+        store.setValue(REPORT_KEYWORDS, s);
+    }
+
     public boolean getShowIPAddressesInChat() {
         return store.getBoolean(IP_ADDRESSES_IN_CHAT);
     }
@@ -292,11 +304,8 @@ public class ClientPreferences extends PreferenceStoreProxy {
     protected Locale locale = null;
 
     public void setLocale(String l) {
-        LocaleParser p = new LocaleParser();
-        if (!p.parse(l)) {
-            locale = new Locale(p.getLanguage(), p.getCountry(), p.getVariant());
-            store.setValue(LOCALE, getLocaleString());
-        }
+        locale = new Locale(l);
+        store.setValue(LOCALE, getLocaleString());
     }
 
     public Locale getLocale() {
@@ -311,11 +320,11 @@ public class ClientPreferences extends PreferenceStoreProxy {
             return "";
         }
         StringBuilder result = new StringBuilder();
-        if (locale.getLanguage().length() != 0) {
+        if (!locale.getLanguage().isBlank()) {
             result.append(locale.getLanguage());
-            if (locale.getCountry().length() != 0) {
+            if (!locale.getCountry().isBlank()) {
                 result.append("_").append(locale.getCountry());
-                if (locale.getVariant().length() != 0) {
+                if (!locale.getVariant().isBlank()) {
                     result.append("_").append(locale.getVariant());
                 }
             }
@@ -325,12 +334,12 @@ public class ClientPreferences extends PreferenceStoreProxy {
 
     protected void setMekHitLocLog() {
         String name = store.getString(MEK_HIT_LOC_LOG);
-        if (name.length() != 0) {
+        if (!name.isEmpty()) {
             try {
                 mekHitLocLog = new PrintWriter(new BufferedWriter(new FileWriter(name)));
                 mekHitLocLog.println("Table\tSide\tRoll");
-            } catch (Throwable thrown) {
-                thrown.printStackTrace();
+            } catch (Throwable t) {
+                LogManager.getLogger().error("", t);
                 mekHitLocLog = null;
             }
         }

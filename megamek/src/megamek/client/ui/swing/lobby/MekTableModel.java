@@ -43,6 +43,7 @@ import java.awt.*;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 
+import static megamek.client.ui.swing.tooltip.TipUtil.*;
 import static megamek.client.ui.swing.util.UIUtil.alternateTableBGColor;
 import static megamek.client.ui.swing.util.UIUtil.guiScaledFontHTML;
 import static megamek.client.ui.swing.util.UIUtil.uiGreen;
@@ -188,8 +189,10 @@ public class MekTableModel extends AbstractTableModel {
         } else {
             MapSettings mset = chatLounge.mapSettings;
             Player lPlayer = clientGui.getClient().getLocalPlayer();
-            unitTooltips.add("<HTML>" + UnitToolTip.getEntityTipLobby(entity, lPlayer, mset));
-            pilotTooltips.add("<HTML>" + PilotToolTip.getPilotTipDetailed(entity));
+            String s = UnitToolTip.getEntityTipLobby(entity, lPlayer, mset).toString();
+            unitTooltips.add( HTML_BEGIN + s + HTML_END);
+            s = PilotToolTip.getPilotTipDetailed(entity, true).toString() + PilotToolTip.getCrewAdvs(entity, true).toString();
+            pilotTooltips.add(HTML_BEGIN + s + HTML_END);
         }
         final boolean rpgSkills = clientGui.getClient().getGame().getOptions().booleanOption(OptionsConstants.RPG_RPG_GUNNERY);
         if (chatLounge.isCompact()) {
@@ -240,6 +243,10 @@ public class MekTableModel extends AbstractTableModel {
     
     /** Creates and returns the display content of the "Player" column for the given entity. */
     private String playerCellContent(final Entity entity) {
+        if (entity == null) {
+            return "";
+        }
+
         StringBuilder result = new StringBuilder("<HTML><NOBR>");
         Player owner = ownerOf(entity);
         boolean isEnemy = clientGui.getClient().getLocalPlayer().isEnemyOf(owner);
@@ -332,7 +339,7 @@ public class MekTableModel extends AbstractTableModel {
             } else {
                 if (column == COLS.UNIT.ordinal()) {
                     setToolTipText(unitTooltips.get(row));
-                    final Camouflage camouflage = entity.getCamouflageOrElse(entity.getOwner().getCamouflage());
+                    final Camouflage camouflage = entity.getCamouflageOrElseOwners();
                     final Image icon = clientGui.getBoardView().getTilesetManager().loadPreviewImage(entity, camouflage, this);
                     if (!compact) {
                         setIcon(icon, size);

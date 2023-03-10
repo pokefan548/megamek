@@ -57,6 +57,7 @@ public final class ImageUtil {
         try {
             gd = ge.getDefaultScreenDevice();
         } catch (HeadlessException ignored) {
+
         }
         GC = (null != gd) ? gd.getDefaultConfiguration() : null;
     }
@@ -138,12 +139,10 @@ public final class ImageUtil {
             g2.drawImage(img, 0, 0, newWidth, newHeight, null);
             return scaled;
         } else {
-            ImageFilter filter;
-            filter = new ImprovedAveragingScaleFilter(img.getWidth(null),
+            ImageFilter filter = new ImprovedAveragingScaleFilter(img.getWidth(null),
                     img.getHeight(null), newWidth, newHeight);
 
-            ImageProducer prod;
-            prod = new FilteredImageSource(img.getSource(), filter);
+            ImageProducer prod = new FilteredImageSource(img.getSource(), filter);
             Image result = Toolkit.getDefaultToolkit().createImage(prod);
             waitUntilLoaded(result);
             return ImageUtil.createAcceleratedImage(result);
@@ -219,19 +218,19 @@ public final class ImageUtil {
     }
 
     /**
-     * ImageLoader that loads sub-regions from a larger atlas file. The filename is assumed to have the format:
-     * <imageFile>(X,Y-Width,Height), where X,Y is the start of the image tile, and Width,Height are the size of the
-     * image tile.
+     * ImageLoader that loads sub-regions from a larger atlas file. The filename is assumed to have
+     * the format {imageFile}(X,Y-Width,Height), where X,Y is the start of the image tile, and
+     * Width,Height are the size of the image tile.
      */
     public static class TileMapImageLoader implements ImageLoader {
         /**
-         * Given a String with the format "X,Y" split this into the X,Y components, and use those to greate a Coords
-         * object.
+         * Given a String with the format "X,Y" split this into the X,Y components, and use those to
+         * create a Coords object.
          *
          * @param c
          * @return
          */
-        protected Coords parseCoords(String c) {
+        protected @Nullable Coords parseCoords(@Nullable String c) {
             if (null == c || c.isEmpty()) {
                 return null;
             }
@@ -249,11 +248,11 @@ public final class ImageUtil {
         }
 
         /**
-         * Given a string with the format <imageFile>(X,Y-W,H), load the image file and then use X,Y and W,H to find a
-         * sub-image within the original image and return that sub-image.
+         * Given a string with the format {imageFile}(X,Y-W,H), load the image file and then use
+         * X,Y and W,H to find a sub-image within the original image and return that sub-image.
          */
         @Override
-        public Image loadImage(String fileName) {
+        public @Nullable Image loadImage(String fileName) {
             int tileStart = fileName.indexOf('(');
             int tileEnd = fileName.indexOf(')');
             if ((tileStart == -1) || (tileEnd == -1) || (tileEnd < tileStart)) {
@@ -274,7 +273,7 @@ public final class ImageUtil {
             if (!baseFile.exists()) {
                 return null;
             }
-            System.out.println("Loading atlas: " + baseFile);
+            LogManager.getLogger().info("Loading atlas: " + baseFile);
             Image base = Toolkit.getDefaultToolkit().getImage(baseFile.getPath());
             if (null == base) {
                 return null;
@@ -298,7 +297,6 @@ public final class ImageUtil {
      * the corresponding key which includes an atlas and offset.
      */
     public static class AtlasImageLoader extends TileMapImageLoader {
-
         ImageAtlasMap imgFileToAtlasMap;
 
         public AtlasImageLoader() {
@@ -356,7 +354,8 @@ public final class ImageUtil {
                    start.getX(), start.getY(), start.getX() + size.getX(), start.getY() + size.getY(), null);
                g2d.dispose();
                return img;
-            } else { // Otherwise just return the image loaded from the atlas
+            } else {
+                // Otherwise just return the image loaded from the atlas
                 return super.loadImage(imgFileToAtlasMap.get(p));
             }
         }
@@ -378,7 +377,7 @@ public final class ImageUtil {
             while (!observer.isLoaded() && runTime < maxRuntime) {
                 try {
                     Thread.sleep(10);
-                } catch (InterruptedException ex) {
+                } catch (InterruptedException ignored) {
                     // Do nothing
                 }
                 runTime = System.currentTimeMillis() - startTime;

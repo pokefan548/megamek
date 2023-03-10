@@ -1,5 +1,5 @@
 /*
- * MegaMek - Copyright (C) 2004, 2005 Ben Mazur (bmazur@sev.org)
+ * Copyright (c) 2004-2005 - Ben Mazur (bmazur@sev.org).
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -14,7 +14,9 @@
 package megamek.common.weapons.battlearmor;
 
 import megamek.common.AmmoType;
+import megamek.common.Mounted;
 import megamek.common.WeaponType;
+import megamek.common.alphaStrike.AlphaStrikeElement;
 import megamek.common.weapons.Weapon;
 
 /**
@@ -59,7 +61,17 @@ public class CLBAMortarLight extends Weapon {
                 .setISApproximate(true, false, false, false, false)
                 .setClanAdvancement(DATE_NONE, DATE_NONE, 3065, DATE_NONE, DATE_NONE)
                 .setClanApproximate(false, false, true, false, false)
-                .setPrototypeFactions(F_FS,F_LC)	
+                .setPrototypeFactions(F_FS, F_LC)
                 .setProductionFactions(F_LC);
+    }
+
+    @Override
+    public double getBattleForceDamage(int range, Mounted linked) {
+        return (range <= AlphaStrikeElement.SHORT_RANGE) ? 0.276 : 0;
+    }
+
+    @Override
+    public boolean isAlphaStrikeIndirectFire() {
+        return true;
     }
 }

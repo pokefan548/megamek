@@ -17,6 +17,7 @@ package megamek.common.actions;
 
 import megamek.client.ui.Messages;
 import megamek.common.*;
+import megamek.common.annotations.Nullable;
 import megamek.common.options.OptionsConstants;
 
 public class PhysicalAttackAction extends AbstractAttackAction {
@@ -33,12 +34,13 @@ public class PhysicalAttackAction extends AbstractAttackAction {
     /**
      * Common checking whether is it possible to physically attack the target
      *
-     * @param game
-     * @param ae        Attacking Entity
-     * @param target    Target
+     * @param game The current {@link Game}
+     * @param ae the attacking {@link Entity}, which may be null
+     * @param target the attack's target
      * @return reason the attack is impossible, or null if it is possible
      */
-    protected static String toHitIsImpossible(Game game, Entity ae, Targetable target) {
+    protected static @Nullable String toHitIsImpossible(Game game, @Nullable Entity ae,
+                                                        Targetable target) {
         if (target == null) {
             return "target is null";
         }
@@ -125,7 +127,7 @@ public class PhysicalAttackAction extends AbstractAttackAction {
     protected static void setCommonModifiers(ToHitData toHit, Game game, Entity ae, Targetable target) {
         boolean inSameBuilding = Compute.isInSameBuilding(game, ae, target);
         int attackerId = ae.getId();
-        int targetId = target.getTargetId();
+        int targetId = target.getId();
         // Battle Armor targets are hard for Meks and Tanks to hit.
         if (target instanceof BattleArmor) {
             toHit.addModifier(1, "battle armor target");

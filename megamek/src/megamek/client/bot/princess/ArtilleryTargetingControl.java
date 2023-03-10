@@ -23,15 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import megamek.common.AmmoType;
-import megamek.common.Compute;
-import megamek.common.Coords;
-import megamek.common.Entity;
-import megamek.common.HexTarget;
-import megamek.common.Game;
-import megamek.common.Mounted;
-import megamek.common.Targetable;
-import megamek.common.WeaponType;
+import megamek.common.*;
 import megamek.common.actions.ArtilleryAttackAction;
 import megamek.common.options.OptionsConstants;
 
@@ -73,9 +65,11 @@ public class ArtilleryTargetingControl {
      * @param damage
      * @param coords
      * @param shooter
-     * @param game
+     * @param game The current {@link Game}
+     * @param owner the {@link Princess} bot to calculate for
      */
-    public double calculateDamageValue(int damage, Coords coords, Entity shooter, Game game, Princess owner) {
+    public double calculateDamageValue(int damage, Coords coords, Entity shooter, Game game,
+                                       Princess owner) {
         if (getDamageValue(damage, coords) != null) {
             return getDamageValue(damage, coords);
         }
@@ -108,7 +102,7 @@ public class ArtilleryTargetingControl {
      * @param damage How much damage will we do
      * @param coords Coordinates to hit
      * @param shooter Entity doing the shooting
-     * @param game Game pointer
+     * @param game The current {@link Game}
      */
     private double calculateDamageValueForHex(int damage, Coords coords, Entity shooter, Game game, Princess owner) {
         double value = 0;
@@ -185,7 +179,7 @@ public class ArtilleryTargetingControl {
      * This includes hexes on and within the max radius of all non-airborne enemy entities
      * and hexes on and within the max radius of all strategic targets.
      * @param shooter Entity doing the shooting
-     * @param game Game pointer
+     * @param game The current {@link Game}
      * @param owner Bot pointer
      */
     private void buildTargetList(Entity shooter, Game game, Princess owner) {
@@ -194,8 +188,12 @@ public class ArtilleryTargetingControl {
         for (Iterator<Entity> enemies = game.getAllEnemyEntities(shooter); enemies.hasNext();) {
             Entity e = enemies.next();
             
-            // skip airborne entities, and those off board - we'll handle them later
-            if (!e.isAirborne() && !e.isAirborneVTOLorWIGE() && !e.isOffBoard()) {
+            // skip airborne entities, and those off board - we'll handle them later and don't target ignored units
+            if (!e.isAirborne()
+                    && !e.isAirborneVTOLorWIGE()
+                    && !e.isOffBoard()
+                    && !owner.getBehaviorSettings().getIgnoredUnitTargets().contains(e.getId())) {
+
                 targetSet.add(new HexTarget(e.getPosition(), Targetable.TYPE_HEX_ARTILLERY));
                 
                 // while we're here, consider shooting at hexes within "MAX_BLAST_RADIUS"
@@ -224,7 +222,7 @@ public class ArtilleryTargetingControl {
      * to the given HexTarget set. 
      * @param coords Center coordinates
      * @param targetList List of target hexes
-     * @param game game pointer
+     * @param game The current {@link Game}
      */
     private void addHexDonuts(Coords coords, Set<Targetable> targetList, Game game) {
         // while we're here, consider shooting at hexes within "MAX_BLAST_RADIUS"
@@ -242,7 +240,7 @@ public class ArtilleryTargetingControl {
     /**
      * Calculate an indirect artillery "fire plan", taking into account the possibility of rotating the turret.
      * @param shooter Entity doing the shooting
-     * @param game Game pointer
+     * @param game The current {@link Game}
      * @param owner Princess pointer
      * @return Firing plan
      */
@@ -255,7 +253,7 @@ public class ArtilleryTargetingControl {
     /**
      * Put together an indirect artillery "fire plan".
      * @param shooter Entity doing the shooting
-     * @param game Game pointer
+     * @param game The current {@link Game}
      * @param owner Princess pointer
      * @return Firing plan
      */
@@ -328,15 +326,17 @@ public class ArtilleryTargetingControl {
                 if (!topValuedFireInfos.isEmpty()) {
                     WeaponFireInfo actualFireInfo = topValuedFireInfos.get(Compute.randomInt(topValuedFireInfos.size()));
                     ArtilleryAttackAction aaa = (ArtilleryAttackAction) actualFireInfo.buildWeaponAttackAction();
-                    int ammoID = findAmmo(shooter, currentWeapon, game);
-                    if (ammoID > NO_AMMO) {
+                    HelperAmmo ammo= findAmmo(shooter, currentWeapon);
+
+                    if (ammo.equipmentNum > NO_AMMO) {
                         //This can happen if princess is towing ammo trailers, which she really shouldn't be doing...
-                        aaa.setAmmoId(ammoID);
+                        aaa.setAmmoId(ammo.equipmentNum);
+                        aaa.setAmmoMunitionType(ammo.munitionType);
                         aaa.setAmmoCarrier(shooter.getId());
                         actualFireInfo.setAction(aaa);
                         retval.add(actualFireInfo);
                         retval.setUtility(retval.getUtility() + maxDamage);
-                        owner.sendAmmoChange(shooter.getId(), shooter.getEquipmentNum(currentWeapon), ammoID);
+                        owner.sendAmmoChange(shooter.getId(), shooter.getEquipmentNum(currentWeapon), ammo.equipmentNum);
                     }
                 }
             } else if (currentWeapon.getType().hasFlag(WeaponType.F_TAG)) {
@@ -357,7 +357,7 @@ public class ArtilleryTargetingControl {
     /**
      * Worker function that calculates the shooter's "best" actions that result in a TAG being fired.
      * @param shooter
-     * @param game
+     * @param game The current {@link Game}
      * @param owner
      * @return
      */
@@ -376,16 +376,26 @@ public class ArtilleryTargetingControl {
         
         return retval;
     }
-    
+
+    private static class HelperAmmo {
+        public int equipmentNum;
+        public long munitionType;
+
+        public HelperAmmo(int equipmentNum, long munitionType) {
+            this.equipmentNum = equipmentNum;
+            this.munitionType = munitionType;
+        }
+    }
+
     /**
      * Worker function that selects the appropriate ammo for the given entity and weapon.
      * @param shooter
      * @param currentWeapon
-     * @param game
      * @return
      */
-    private int findAmmo(Entity shooter, Mounted currentWeapon, Game game) {
+    private HelperAmmo findAmmo(Entity shooter, Mounted currentWeapon) {
         int ammoEquipmentNum = NO_AMMO;
+        long ammoMunitionType = -1;
         
         // simply grab the first valid ammo and let 'er rip.
         for (Mounted ammo : shooter.getAmmo()) {
@@ -394,13 +404,14 @@ public class ArtilleryTargetingControl {
             }
             
             ammoEquipmentNum = shooter.getEquipmentNum(ammo);
+            ammoMunitionType = ((AmmoType) ammo.getType()).getMunitionType();
             break;
             
             // TODO: Attempt to select homing ammo if the target is tagged. 
             // To do so, check ammoType.getMunitionType() == AmmoType.M_HOMING
         }
         
-        return ammoEquipmentNum;
+        return new HelperAmmo(ammoEquipmentNum, ammoMunitionType);
     }
 
     /**

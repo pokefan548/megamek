@@ -33,6 +33,7 @@ import org.apache.logging.log4j.LogManager;
 import java.io.PrintWriter;
 import java.math.BigInteger;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -825,19 +826,6 @@ public abstract class Mech extends Entity {
     }
 
     /**
-     * does this mech have SCM?
-     */
-    public boolean hasSCM() {
-        for (Mounted m : getEquipment()) {
-            if ((m.getType() instanceof MiscType)
-                    && m.getType().hasFlag(MiscType.F_SCM)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
      * does this mech have industrial TSM=
      *
      * @return
@@ -1169,8 +1157,8 @@ public abstract class Mech extends Entity {
      */
     @Override
     public int getSprintHeat() {
-        int extra = bDamagedCoolantSystem?1:0;
-        return extra + (hasEngine() ? getEngine().getSprintHeat() : 0);
+        int extra = bDamagedCoolantSystem ? 1 : 0;
+        return extra + (hasEngine() ? getEngine().getSprintHeat(this) : 0);
     }
 
     /**
@@ -1230,15 +1218,21 @@ public abstract class Mech extends Entity {
         return Math.max(jump, 0);
     }
 
-    /**
-     * Gives the bonus to Jump MP conferred by a mech partial wing.
-     *
-     * @param mount
-     *            The mounted location of the Wing
-     * @return The Jump MP bonus conferred by the wing
-     */
-    public int getPartialWingJumpBonus(Mounted mount) {
+
+    public int getPartialWingJumpWeightClassBonus()  {
         int bonus;
+
+        if ((getWeightClass() <= EntityWeightClass.WEIGHT_MEDIUM)) {
+            bonus = 2;
+        } else {
+            bonus = 1;
+        }
+
+        return bonus;
+    }
+    public int getPartialWingJumpAtmoBonus()  {
+        int bonus;
+
         if (game != null) {
             if ((getWeightClass() <= EntityWeightClass.WEIGHT_MEDIUM)) {
                 switch (game.getPlanetaryConditions().getAtmosphere()) {
@@ -1275,12 +1269,23 @@ public abstract class Mech extends Entity {
                 }
             }
         } else {
-            if ((getWeightClass() <= EntityWeightClass.WEIGHT_MEDIUM)) {
-                bonus = 2;
-            } else {
-                bonus = 1;
-            }
+            bonus = getPartialWingJumpWeightClassBonus();
         }
+
+        return bonus;
+    }
+
+    /**
+     * Gives the bonus to Jump MP conferred by a mech partial wing.
+     *
+     * @param mount
+     *            The mounted location of the Wing
+     * @return The Jump MP bonus conferred by the wing
+     */
+    public int getPartialWingJumpBonus(Mounted mount) {
+        int bonus;
+
+        bonus = getPartialWingJumpAtmoBonus();
 
         // subtract jumping bonus for damaged criticals
         bonus -= getBadCriticals(CriticalSlot.TYPE_EQUIPMENT,
@@ -1667,10 +1672,10 @@ public abstract class Mech extends Entity {
         return "Heat Sink";
     }
 
-    public int getHeatCapacity(boolean includePartialWing,
-            boolean includeRadicalHeatSink) {
+    public int getHeatCapacity(boolean includePartialWing, boolean includeRadicalHeatSink) {
         int capacity = 0;
         int activeCount = getActiveSinks();
+        boolean isDoubleHeatSink = false;
 
         for (Mounted mounted : getMisc()) {
             if (mounted.isDestroyed() || mounted.isBreached()) {
@@ -1684,26 +1689,24 @@ public abstract class Mech extends Entity {
                     && mounted.getType().hasFlag(MiscType.F_DOUBLE_HEAT_SINK)) {
                 activeCount--;
                 capacity += 2;
+                isDoubleHeatSink = true;
             } else if (mounted.getType().hasFlag(
                     MiscType.F_IS_DOUBLE_HEAT_SINK_PROTOTYPE)) {
                 capacity += 2;
+                isDoubleHeatSink = true;
             } else if (includePartialWing
                     && mounted.getType().hasFlag(MiscType.F_PARTIAL_WING)
-                    && // unless
-                       // all crits
-                       // are
-                       // destroyed,
-                       // we get
-                       // the bonus
+                    && // unless all crits are destroyed, we get the bonus
                     ((getGoodCriticals(CriticalSlot.TYPE_EQUIPMENT,
-                            getEquipmentNum(mounted), Mech.LOC_RT) > 0) || (getGoodCriticals(
-                            CriticalSlot.TYPE_EQUIPMENT,
+                            getEquipmentNum(mounted), Mech.LOC_RT) > 0)
+                            || (getGoodCriticals(CriticalSlot.TYPE_EQUIPMENT,
                             getEquipmentNum(mounted), Mech.LOC_LT) > 0))) {
                 capacity += getPartialWingHeatBonus();
                 includePartialWing = false; // Only count the partial wing bonus
                                             // once.
             }
         }
+        capacity -= damagedSCMCritCount() * (isDoubleHeatSink ? 2 : 1);
         // AirMech mode for LAMs confers the same heat benefits as a partial wing.
         if (includePartialWing && movementMode == EntityMovementMode.WIGE) {
             capacity += getPartialWingHeatBonus();
@@ -1713,7 +1716,7 @@ public abstract class Mech extends Entity {
             capacity += (int) Math.ceil(getActiveSinks() * 0.4);
         }
 
-        return capacity;
+        return Math.max(capacity, 0);
     }
 
     /**
@@ -3846,19 +3849,33 @@ public abstract class Mech extends Entity {
     }
 
     /**
-     * @return Returns the autoEject.
+     * @return unit has an ejection seat
      */
-    public boolean isAutoEject() {
-        boolean hasEjectSeat = (getCockpitType() != COCKPIT_TORSO_MOUNTED) && !hasQuirk(OptionsConstants.QUIRK_NEG_NO_EJECT);
+    public boolean hasEjectSeat() {
+        // Ejection Seat
+        boolean result = true;
+        // torso mounted cockpits don't have an ejection seat
+        if (getCockpitType() == Mech.COCKPIT_TORSO_MOUNTED
+                || hasQuirk(OptionsConstants.QUIRK_NEG_NO_EJECT)) {
+            result = false;
+        }
         if (isIndustrial()) {
+            result = false;
             // industrials can only eject when they have an ejection seat
-            for (Mounted misc : miscList) {
+            for (Mounted misc : getMisc()) {
                 if (misc.getType().hasFlag(MiscType.F_EJECTION_SEAT)) {
-                    hasEjectSeat = true;
+                    result = true;
                 }
             }
         }
-        return autoEject && hasEjectSeat;
+        return result;
+    }
+
+    /**
+     * @return Returns the autoEject.
+     */
+    public boolean isAutoEject() {
+        return autoEject && hasEjectSeat();
     }
 
     /**
@@ -5860,256 +5877,7 @@ public abstract class Mech extends Entity {
         return fullHeadEject;
     }
 
-    /**
-     * Start of Battle Force Conversion Methods
-     */
-
-    @Override
-    public double getBaseBattleForceMovement() {
-        double move = getOriginalWalkMP();
-
-        MPBoosters mpBooster = getMPBoosters();
-        if (mpBooster.isMASCAndSupercharger()) {
-            move *= 1.5;
-        } else if (mpBooster.isMASCXorSupercharger()) {
-            move *= 1.25;
-        }
-
-        if (hasMPReducingHardenedArmor()) {
-            move--;
-        }
-
-        if (getMisc().stream().filter(m -> m.getType().hasFlag(MiscType.F_CLUB))
-                .map(m -> m.getType().getSubType())
-                .anyMatch(st -> st == MiscType.S_SHIELD_LARGE || st == MiscType.S_SHIELD_MEDIUM)) {
-            move--;
-        }
-        return move;
-    }
-
-    @Override
-    /*
-     * returns the battle force structure points for a mech
-     */
-    public int getBattleForceStructurePoints() {
-        int battleForceStructure = 0;
-        int battleForceEngineType = 0;
-
-        int[][] battleForceStructureTable = new int[][] {
-                { 1, 1, 2, 2, 3, 3, 3, 4, 4, 5, 5, 5, 6, 6, 6, 7, 7, 8, 8,
-                    8, 8, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12, 13, 13, 13, 14, 14, 14, 15, 15 },
-                { 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 7, 7, 7, 8, 8, 9, 10, 10, 10,
-                    11, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20 },
-                { 1, 1, 1, 2, 2, 2, 2, 3, 3, 4, 4, 4, 4, 5, 5, 5, 6, 6, 6,
-                    6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 11, 12, 12 },
-                { 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5,
-                    5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10 },
-                { 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4,
-                    5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9 },
-                { 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4,
-                    4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8 },
-                { 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3,
-                    3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6 },
-                { 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3,
-                    4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 7, 7 },
-                { 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3,
-                    3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5 } };
-
-        if (hasEngine()) {
-            if (isClan()) {
-                if (getEngine().hasFlag(Engine.LARGE_ENGINE)) {
-                    switch (getEngine().getEngineType()) {
-                        case Engine.XL_ENGINE:
-                            battleForceEngineType = 5;
-                            break;
-                        case Engine.XXL_ENGINE:
-                            battleForceEngineType = 8;
-                            break;
-                    }
-                } else {
-                    switch (getEngine().getEngineType()) {
-                        case Engine.XL_ENGINE:
-                            battleForceEngineType = 4;
-                            break;
-                        case Engine.XXL_ENGINE:
-                            battleForceEngineType = 6;
-                            break;
-                        default:
-                            battleForceEngineType = 1;
-                            break;
-                    }
-                }
-            } else {
-                if (getEngine().hasFlag(Engine.LARGE_ENGINE)) {
-                    switch (getEngine().getEngineType()) {
-                        case Engine.XL_ENGINE:
-                            battleForceEngineType = 5;
-                            break;
-                        case Engine.XXL_ENGINE:
-                            battleForceEngineType = 9;
-                            break;
-                        case Engine.LIGHT_ENGINE:
-                            battleForceEngineType = 5;
-                            break;
-                        default:
-                            battleForceEngineType = 3;
-                            break;
-                    }
-                } else {
-                    switch (getEngine().getEngineType()) {
-                        case Engine.XL_ENGINE:
-                            battleForceEngineType = 5;
-                            break;
-                        case Engine.COMPACT_ENGINE:
-                            battleForceEngineType = 2;
-                            break;
-                        case Engine.LIGHT_ENGINE:
-                            battleForceEngineType = 4;
-                            break;
-                        case Engine.XXL_ENGINE:
-                            battleForceEngineType = 7;
-                            break;
-                        default:
-                            battleForceEngineType = 1;
-                            break;
-                    }
-                }
-            }
-        }
-
-        battleForceStructure = battleForceStructureTable[battleForceEngineType - 1][((int) getWeight() / 5) - 2];
-
-        if (getStructureType() == EquipmentType.T_STRUCTURE_COMPOSITE) {
-            battleForceStructure = (int) Math.ceil(battleForceStructure * .5);
-        } else if (getStructureType() == EquipmentType.T_STRUCTURE_REINFORCED) {
-            battleForceStructure *= 2;
-        }
-        return battleForceStructure;
-
-    }
-
-    @Override
-    public int getNumBattleForceWeaponsLocations() {
-        return 2;
-    }
-
-    @Override
-    public double getBattleForceLocationMultiplier(int index, int location, boolean rearMounted) {
-        if ((index == 0 && !rearMounted
-                || (index == 1) && rearMounted)) {
-            return 1.0;
-        }
-        return 0;
-    }
-
-    @Override
-    public String getBattleForceLocationName(int index) {
-        if (index == 1) {
-            return "REAR";
-        }
-        return "";
-    }
-
-    @Override
-    public boolean isBattleForceRearLocation(int index) {
-        return index == 1;
-    }
-
-    @Override
-    public int getBattleForceTotalHeatGeneration(boolean allowRear) {
-        int totalHeat = 0;
-
-        // finish the max heat calculations
-        if (this.getJumpMP() > 0) {
-            totalHeat += getJumpHeat(getJumpMP());
-        } else if (!isIndustrial() && hasEngine()) {
-            totalHeat += getEngine().getRunHeat(this);
-        }
-
-        for (Mounted mount : getWeaponList()) {
-            WeaponType weapon = (WeaponType) mount.getType();
-            if (weapon.hasFlag(WeaponType.F_ONESHOT)
-                || (allowRear && !mount.isRearMounted())
-                || (!allowRear && mount.isRearMounted())) {
-                continue;
-            }
-            if (weapon.getAmmoType() == AmmoType.T_AC_ROTARY) {
-                totalHeat += weapon.getHeat() * 6;
-            } else if (weapon.getAmmoType() == AmmoType.T_AC_ULTRA
-                    || weapon.getAmmoType() == AmmoType.T_AC_ULTRA_THB) {
-                totalHeat += weapon.getHeat() * 2;
-            } else {
-                totalHeat += weapon.getHeat();
-            }
-        }
-
-        if (hasWorkingMisc(MiscType.F_STEALTH, -1)) {
-            totalHeat += 10;
-        }
-
-        return totalHeat;
-    }
-
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        specialAbilities.put(BattleForceSPA.SRCH, null);
-        for (Mounted m : getEquipment()) {
-            if (!(m.getType() instanceof MiscType)) {
-                continue;
-            }
-            if (m.getType().hasFlag(MiscType.F_HARJEL)) {
-                specialAbilities.put(BattleForceSPA.BHJ, null);
-            } else if (m.getType().hasFlag(MiscType.F_HARJEL_II)) {
-                specialAbilities.put(BattleForceSPA.BHJ2, null);
-            } else if (m.getType().hasFlag(MiscType.F_HARJEL_III)) {
-                specialAbilities.put(BattleForceSPA.BHJ3, null);
-            } else if (((MiscType) m.getType()).isShield()) {
-                specialAbilities.put(BattleForceSPA.SHLD, null);
-            } else if (m.getType().hasFlag(MiscType.F_INDUSTRIAL_TSM)) {
-                specialAbilities.put(BattleForceSPA.ITSM, null);
-            } else if (m.getType().hasFlag(MiscType.F_TSM)) {
-                specialAbilities.put(BattleForceSPA.TSM, null);
-            } else if (m.getType().hasFlag(MiscType.F_VOIDSIG)) {
-                specialAbilities.put(BattleForceSPA.MAS, null);
-            } else if (isIndustrial() && m.getType().hasFlag(MiscType.F_ENVIRONMENTAL_SEALING)
-                    && getEngine().getEngineType() != Engine.COMBUSTION_ENGINE) {
-                specialAbilities.put(BattleForceSPA.SOA, null);
-            } else if (m.getType().hasFlag(MiscType.F_NULLSIG)
-                    || m.getType().hasFlag(MiscType.F_CHAMELEON_SHIELD)) {
-                specialAbilities.put(BattleForceSPA.STL, null);
-                specialAbilities.put(BattleForceSPA.ECM, null);
-            } else if (m.getType().hasFlag(MiscType.F_UMU)) {
-                specialAbilities.put(BattleForceSPA.UMU, null);
-            } else if (m.getType().hasFlag(MiscType.F_BATTLEMECH_NIU)) {
-                specialAbilities.put(BattleForceSPA.DN, null);
-            }
-        }
-        if (getCockpitType() == COCKPIT_COMMAND_CONSOLE) {
-            specialAbilities.merge(BattleForceSPA.MHQ, 1, Integer::sum);
-        } else if (getCockpitType() == COCKPIT_SUPERHEAVY_COMMAND_CONSOLE) {
-            specialAbilities.merge(BattleForceSPA.MHQ, 1, Integer::sum);
-        } else if (getCockpitType() == COCKPIT_SMALL_COMMAND_CONSOLE) {
-            specialAbilities.merge(BattleForceSPA.MHQ, 1, Integer::sum);
-        } else if (getCockpitType() == COCKPIT_VRRP) {
-            specialAbilities.merge(BattleForceSPA.VR, 1, Integer::sum);
-        }
-        if (isIndustrial()) {
-            if (getCockpitType() == Mech.COCKPIT_STANDARD) {
-                specialAbilities.put(BattleForceSPA.AFC, null);
-            } else {
-                specialAbilities.put(BattleForceSPA.BFC, null);
-            }
-        } else {
-            specialAbilities.put(BattleForceSPA.SOA, null);
-        }
-    }
-
     public abstract boolean hasMPReducingHardenedArmor();
-
-    /**
-     * End of Battle Force Conversion Methods
-     */
 
     @Override
     public int getEngineHits() {
@@ -6787,5 +6555,24 @@ public abstract class Mech extends Entity {
     @Override
     public int getSpriteDrawPriority() {
         return 6;
+    }
+
+    @Override
+    public boolean isMek() {
+        return true;
+    }
+
+    @Override
+    public boolean isIndustrialMek() {
+        return isIndustrial();
+    }
+
+    @Override
+    public boolean getsAutoExternalSearchlight() {
+        return true;
+    }
+
+    public static List<String> getCockpitDescrtiption() {
+        return Arrays.stream(COCKPIT_STRING).collect(Collectors.toList());
     }
 }

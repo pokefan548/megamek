@@ -24,9 +24,7 @@ import megamek.common.weapons.infantry.InfantryWeapon;
 import org.apache.logging.log4j.LogManager;
 
 import java.text.NumberFormat;
-import java.util.Arrays;
-import java.util.Map;
-import java.util.Vector;
+import java.util.*;
 
 /**
  * This class represents a squad or point of battle armor equipped infantry,
@@ -342,7 +340,7 @@ public class BattleArmor extends Infantry {
         setArmorType(EquipmentType.T_ARMOR_BA_STANDARD);
 
         // BA are always one squad
-        squadn = 1;
+        squadCount = 1;
 
         // All Battle Armor squads are Clan until specified otherwise.
         setTechLevel(TechConstants.T_CLAN_TW);
@@ -450,6 +448,17 @@ public class BattleArmor extends Infantry {
                     .getMovementMods(this);
             if (weatherMod != 0) {
                 j = Math.max(j + weatherMod, 0);
+            }
+        }
+        if (null != game) {
+            if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_GUSTING_RAIN) && getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_RAIN)) {
+                j += 1;
+            }
+
+            if (getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_WIND)
+                    && ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WI_STRONG_GALE)
+                    || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WI_STORM))) {
+                j += 1;
             }
         }
         if (gravity) {
@@ -591,19 +600,25 @@ public class BattleArmor extends Infantry {
     @Override
     public HitData rollHitLocation(int table, int side, int aimedLocation, AimingMode aimingMode,
                                    int cover) {
+        return rollHitLocation(side, aimedLocation, aimingMode, false);
+    }
 
+    /**
+     * Battle Armor units can only get hit in undestroyed troopers.
+     *
+     * @param isAttackingConvInfantry Set to true when attacked by CI, as these cannot score TacOps crits
+     */
+    public HitData rollHitLocation(int side, int aimedLocation, AimingMode aimingMode,
+                                   boolean isAttackingConvInfantry) {
         // If this squad was killed, target trooper 1 (just because).
         if (isDoomed()) {
             return new HitData(1);
         }
 
         if ((aimedLocation != LOC_NONE) && !aimingMode.isNone()) {
-
             int roll = Compute.d6(2);
-
             if ((5 < roll) && (roll < 9)) {
-                return new HitData(aimedLocation, side == ToHitData.SIDE_REAR,
-                        true);
+                return new HitData(aimedLocation, side == ToHitData.SIDE_REAR, true);
             }
         }
 
@@ -614,8 +629,7 @@ public class BattleArmor extends Infantry {
         // Remember that there's one more location than the number of troopers.
         // In http://forums.classicbattletech.com/index.php/topic,43203.0.html,
         // "previously destroyed includes the current phase" for rolling hits on
-        // a squad,
-        // modifying previous ruling in the AskThePM FAQ.
+        // a squad, modifying previous ruling in the AskThePM FAQ.
         while ((loc >= locations())
                 || (IArmorState.ARMOR_NA == this.getInternal(loc))
                 || (IArmorState.ARMOR_DESTROYED == this.getInternal(loc))
@@ -623,16 +637,13 @@ public class BattleArmor extends Infantry {
             loc = Compute.d6();
         }
 
-        int critLocation = Compute.d6();
-        // TacOps p. 108 Trooper takes a crit if a second roll is the same
-        // location as the first.
+        // TO:AR p.108: Trooper takes a crit if a second roll is the same location as the first.
         if (game.getOptions().booleanOption(OptionsConstants.ADVCOMBAT_TACOPS_BA_CRITICALS)
-                && (loc == critLocation)) {
+                && (loc == Compute.d6()) && !isAttackingConvInfantry) {
             return new HitData(loc, false, HitData.EFFECT_CRITICAL);
         }
         // Hit that trooper.
         return new HitData(loc);
-
     }
 
     @Override
@@ -735,16 +746,6 @@ public class BattleArmor extends Infantry {
 
         // No surviving troopers, so we're toast.
         return new HitData(Entity.LOC_DESTROYED);
-    }
-
-    /**
-     * Battle Armor units use default behavior for armor and internals.
-     *
-     * @see megamek.common.Infantry#isPlatoon()
-     */
-    @Override
-    protected boolean isPlatoon() {
-        return false;
     }
 
     /**
@@ -1058,6 +1059,12 @@ public class BattleArmor extends Infantry {
      */
     public int getLongStealthMod() {
         return longStealthMod;
+    }
+
+    // Only for ground vehicles and certain infantry
+    @Override
+    public boolean isEligibleForPavementBonus() {
+        return false;
     }
 
     /**
@@ -1725,85 +1732,6 @@ public class BattleArmor extends Infantry {
         return false;
     }
 
-    @Override
-    public void setBattleForceMovement(Map<String,Integer> movement) {
-        if (hasDWP()) {
-            movement.put("", getWalkMP());
-        }
-        int move = Math.max(getWalkMP(true, false, false, true, false),
-                getJumpMP(true, true, true));
-        movement.put(getMovementModeAsBattleForceString(), move);
-    }    
-
-    @Override
-    public void setAlphaStrikeMovement(Map<String,Integer> moves) {
-        if (getMovementMode().equals(EntityMovementMode.INF_JUMP)) {
-            moves.put("j", getJumpMP(true, true, true) * 2);
-        } else if (getMovementMode().equals(EntityMovementMode.INF_UMU)) {
-            moves.put("s", getActiveUMUCount() * 2);
-        } else {
-            moves.put(getMovementModeAsBattleForceString(), getOriginalWalkMP() * 2);
-        }
-    }
-    
-    @Override
-    public int getBattleForceArmorPoints() {
-        double armor = 0;
-        for (int i = 1; i < locations(); i++) {
-            if (armorType[i] == EquipmentType.T_ARMOR_BA_REACTIVE
-                    || armorType[i] == EquipmentType.T_ARMOR_BA_REFLECTIVE) {
-                armor += getArmor(i) * 0.75;
-            } else {
-                armor += getArmor(i);
-            }
-        }
-        return (int) Math.round(armor / 30.0);
-    }
-
-    @Override
-    /**
-     * Each BA squad has 2 structure points
-     */
-    public int getBattleForceStructurePoints() {
-        return 2;
-    }
-
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        for (Mounted m : getEquipment()) {
-            if (!(m.getType() instanceof MiscType)) {
-                continue;
-            }
-            if (m.getType().hasFlag(MiscType.F_VISUAL_CAMO)
-                    && !m.getType().getName().equals(MIMETIC_ARMOR)) {
-                specialAbilities.put(BattleForceSPA.LMAS, null);
-            } else if (m.getType().hasFlag(MiscType.F_VEHICLE_MINE_DISPENSER)) {
-                specialAbilities.merge(BattleForceSPA.MDS, 1, Integer::sum);
-            } else if (m.getType().hasFlag(MiscType.F_TOOLS)
-                    && (m.getType().getSubType() & MiscType.S_MINESWEEPER) == MiscType.S_MINESWEEPER) {
-                specialAbilities.put(BattleForceSPA.MSW, null);
-            } else if (m.getType().hasFlag(MiscType.F_SPACE_ADAPTATION)) {
-                specialAbilities.put(BattleForceSPA.SOA, null);
-            } else if (m.getType().hasFlag(MiscType.F_PARAFOIL)) {
-                specialAbilities.put(BattleForceSPA.PARA, null);
-            } else if (m.getType().hasFlag(MiscType.F_MAGNETIC_CLAMP)) {
-                specialAbilities.put(BattleForceSPA.XMEC, null);
-            }
-        }
-        if (canDoMechanizedBA()) {
-            specialAbilities.put(BattleForceSPA.MEC, null);
-        }
-        switch (getArmorType(0)) {
-            case EquipmentType.T_ARMOR_BA_MIMETIC:
-                specialAbilities.put(BattleForceSPA.MAS, null);
-                break;
-            case EquipmentType.T_ARMOR_BA_FIRE_RESIST:
-                specialAbilities.put(BattleForceSPA.FR, null);
-                break;
-        }
-    }
-
     public void setIsExoskeleton(boolean exoskeleton) {
         this.exoskeleton = exoskeleton;
     }
@@ -2291,5 +2219,15 @@ public class BattleArmor extends Infantry {
     @Override
     public int getSpriteDrawPriority() {
         return 2;
+    }
+
+    @Override
+    protected boolean isFieldWeapon(Mounted equipment) {
+        return false;
+    }
+
+    @Override
+    public boolean isBattleArmor() {
+        return true;
     }
 }

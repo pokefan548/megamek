@@ -16,8 +16,6 @@ import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.cost.ConvFighterCostCalculator;
 import megamek.common.options.OptionsConstants;
 
-import java.util.Map;
-
 /**
  * @author Jay Lawson
  * @since Jun 12, 2008
@@ -28,6 +26,16 @@ public class ConvFighter extends Aero {
     @Override
     public int getUnitType() {
         return UnitType.CONV_FIGHTER;
+    }
+
+    @Override
+    public boolean isConventionalFighter() {
+        return true;
+    }
+
+    @Override
+    public boolean isAerospaceFighter() {
+        return false;
     }
 
     @Override
@@ -57,7 +65,7 @@ public class ConvFighter extends Aero {
 
     @Override
     public int getFuelUsed(int thrust) {
-        if (!hasEngine()) {
+        if (!hasEngine() || getEngine().isSolar()) {
             return 0;
         }
         int overThrust = Math.max(thrust - getWalkMP(), 0);
@@ -117,13 +125,7 @@ public class ConvFighter extends Aero {
         }
         return (getEngine().getRating() / (int) weight);
     }
-    
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        specialAbilities.put(BattleForceSPA.ATMO, null);
-    }
-    
+
     @Override
     public long getEntityType() {
         return Entity.ETYPE_AERO | Entity.ETYPE_CONV_FIGHTER;

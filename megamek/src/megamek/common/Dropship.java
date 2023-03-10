@@ -14,12 +14,10 @@ package megamek.common;
 import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.battlevalue.DropShipBVCalculator;
 import megamek.common.cost.DropShipCostCalculator;
-import megamek.common.enums.GamePhase;
 import megamek.common.options.OptionsConstants;
 
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -88,6 +86,16 @@ public class Dropship extends SmallCraft {
     @Override
     public int getUnitType() {
         return UnitType.DROPSHIP;
+    }
+
+    @Override
+    public boolean isSmallCraft() {
+        return false;
+    }
+
+    @Override
+    public boolean isDropShip() {
+        return true;
     }
 
     @Override
@@ -622,7 +630,7 @@ public class Dropship extends SmallCraft {
         if (null == game) {
             return true;
         }
-        return (isAirborne() || isSpaceborne() || game.getPhase() == GamePhase.LOUNGE);
+        return (isAirborne() || isSpaceborne() || game.getPhase().isLounge());
     }
 
     @Override
@@ -726,15 +734,7 @@ public class Dropship extends SmallCraft {
     public long getEntityType() {
         return Entity.ETYPE_AERO | Entity.ETYPE_SMALL_CRAFT | Entity.ETYPE_DROPSHIP;
     }
-    
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        if (getNCrew() >= 30) {
-            specialAbilities.put(BattleForceSPA.CRW, (int) Math.round(getNCrew() / 60.0));
-        }
-    }
-    
+
     @Override
     public boolean canChangeSecondaryFacing() {
         // flying dropships can execute the "ECHO" maneuver (stratops 113), aka a torso twist, 

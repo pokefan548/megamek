@@ -14,7 +14,7 @@
 package megamek.common.weapons.autocannons;
 
 import megamek.common.AmmoType;
-import megamek.common.BattleForceElement;
+import megamek.common.alphaStrike.AlphaStrikeElement;
 import megamek.common.Game;
 import megamek.common.Mounted;
 import megamek.common.ToHitData;
@@ -33,6 +33,7 @@ import megamek.common.weapons.AttackHandler;
 import megamek.common.weapons.RapidfireACWeaponHandler;
 import megamek.common.weapons.Weapon;
 import megamek.server.GameManager;
+import megamek.server.Server;
 
 /**
  * N.B. This class is overridden for AC/2, AC/5, AC/10, AC/10, NOT ultras/LB/RAC.
@@ -106,13 +107,13 @@ public abstract class ACWeapon extends AmmoWeapon {
         if ((dmg != 5) && (dmg != 2)) {
             return dmg;
         }
-        GameOptions options = getGameOptions();
-        if (options == null) {
-            return dmg;
-        }
-        if (options.getOption(OptionsConstants.ADVCOMBAT_INCREASED_AC_DMG).booleanValue()) {
+
+        if ((Server.getServerInstance() != null)
+                && Server.getServerInstance().getGame().getOptions()
+                        .getOption(OptionsConstants.ADVCOMBAT_INCREASED_AC_DMG).booleanValue()) {
             dmg++;
         }
+
         return dmg;
     }
 
@@ -121,7 +122,7 @@ public abstract class ACWeapon extends AmmoWeapon {
         double damage = 0;
         if (range <= getLongRange()) {
             damage = getRackSize();
-            if (range == BattleForceElement.SHORT_RANGE && getMinimumRange() > 0) {
+            if ((range == AlphaStrikeElement.SHORT_RANGE) && (getMinimumRange() > 0)) {
                 damage = adjustBattleForceDamageForMinRange(damage);
             }
         }

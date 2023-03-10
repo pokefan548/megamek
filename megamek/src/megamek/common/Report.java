@@ -19,12 +19,15 @@ import megamek.client.ui.swing.util.UIUtil;
 import org.apache.logging.log4j.LogManager;
 
 import javax.swing.*;
+import javax.swing.text.html.HTMLEditorKit;
 import javax.swing.text.html.StyleSheet;
 import java.awt.*;
 import java.io.Serializable;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
+
+import static megamek.client.ui.swing.util.UIUtil.uiGray;
 
 /**
  * This class defines a single server report. It holds information such as the
@@ -339,7 +342,10 @@ public class Report implements Serializable {
                 imageCode = "<span id='" + entity.getId() + "'></span>";
             }
 
-            Color ownerColor = entity.getOwner().getColour().getColour();
+            Player owner = entity.getOwner();
+            Color ownerColor = (owner != null) ? owner.getColour().getColour() : uiGray();
+            String ownerName = (owner != null) ? owner.getName() : ReportMessages.getString("report.unknownOwner");
+
             String unitName = href(ENTITY_LINK + entity.getId(), entity.getShortName());
 
             if ((entity.getCrew().getSize() >= 1) && !entity.getCrew().getNickname().isBlank()) {
@@ -347,7 +353,7 @@ public class Report implements Serializable {
             }
 
             add(unitName, true);
-            add(bold(fgColor(ownerColor, entity.getOwner().getName())));
+            add(bold(fgColor(ownerColor, ownerName)));
         }
     }
 
@@ -559,6 +565,12 @@ public class Report implements Serializable {
         } catch (Exception ex) {
             LogManager.getLogger().error("Cannot add a new line", ex);
         }
+    }
+
+    public static void setupStylesheet(JTextPane pane) {
+        pane.setContentType("text/html");
+        StyleSheet styleSheet = ((HTMLEditorKit) pane.getEditorKit()).getStyleSheet();
+        Report.setupStylesheet(styleSheet);
     }
 
     public static void setupStylesheet(StyleSheet styleSheet) {

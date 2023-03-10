@@ -14,8 +14,6 @@ package megamek.common;
 import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.cost.FixedWingSupportCostCalculator;
 
-import java.util.Map;
-
 /**
  * @author Jason Tighe
  * @since 10/31/2010
@@ -34,6 +32,16 @@ public class FixedWingSupport extends ConvFighter {
         super();
         damThresh = new int[] { 0, 0, 0, 0, 0, 0 };
         barRating = new int[locations()];
+    }
+
+    @Override
+    public boolean isFixedWingSupport() {
+        return true;
+    }
+
+    @Override
+    public boolean isConventionalFighter() {
+        return false;
     }
 
     public void setBARRating(int rating, int loc) {
@@ -214,19 +222,6 @@ public class FixedWingSupport extends ConvFighter {
     }
 
     @Override
-    public int getBattleForceSize() {
-        //The tables are on page 356 of StartOps
-        if (getWeight() < 5) {
-            return 1;
-        }
-        if (getWeight() < 100) {
-            return 2;
-        }
-
-        return 3;
-    }
-
-    @Override
     protected int calculateWalk() {
         return getOriginalWalkMP();
     }
@@ -282,15 +277,6 @@ public class FixedWingSupport extends ConvFighter {
     }
 
     @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        specialAbilities.put(BattleForceSPA.ATMO, null);
-        if (getMaxBombPoints() > 0) {
-            specialAbilities.put(BattleForceSPA.BOMB, getMaxBombPoints() / 5);
-        }
-    }
-
-    @Override
     public double getCost(CalculationReport calcReport, boolean ignoreAmmo) {
         return FixedWingSupportCostCalculator.calculateCost(this, calcReport, ignoreAmmo);
     }
@@ -322,5 +308,10 @@ public class FixedWingSupport extends ConvFighter {
     @Override
     public long getEntityType() {
         return Entity.ETYPE_AERO | Entity.ETYPE_CONV_FIGHTER | Entity.ETYPE_FIXED_WING_SUPPORT;
+    }
+
+    @Override
+    public boolean isAerospaceSV() {
+        return true;
     }
 }

@@ -14,17 +14,20 @@
  */
 package megamek.common;
 
+import megamek.common.alphaStrike.*;
+import megamek.common.options.IOption;
+import megamek.common.options.IOptionGroup;
+import megamek.common.options.Quirks;
+import megamek.common.options.WeaponQuirks;
+
 import java.io.File;
 import java.io.Serializable;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Vector;
+import java.util.*;
 
 /**
  * The MechSummary of a unit offers compiled information about the unit without having to load the file.
  */
-public class MechSummary implements Serializable {
+public class MechSummary implements Serializable, ASCardDisplayable {
 
     private String name;
     private String chassis;
@@ -33,7 +36,16 @@ public class MechSummary implements Serializable {
     private String unitType;
     private String unitSubType;
     private String fullAccurateUnitType;
+    private Long entityType;
+    private boolean omni;
+    private boolean military;
+    private int tankTurrets;
     private File sourceFile;
+    private String source;
+    private boolean invalid;
+    private String techLevel;
+    private String techBase;
+    private boolean failedToLoadEquipment;
     private String entryName; // for files in zips
     private int year;
     private int type;
@@ -65,6 +77,43 @@ public class MechSummary implements Serializable {
     private String engineName;
     private int gyroType;
     private String myomerName;
+    private int lowerArms;
+    private int hands;
+    private double troopCarryingSpace;
+    private int aSFBays;
+    private int aSFDoors;
+    private double aSFUnits;
+    private int smallCraftBays;
+    private int smallCraftDoors;
+    private double smallCraftUnits;
+    private int dockingCollars;
+    private int mechBays;
+    private int mechDoors;
+    private double mechUnits;
+    private int heavyVehicleBays;
+    private int heavyVehicleDoors;
+    private double heavyVehicleUnits;
+    private int lightVehicleBays;
+    private int lightVehicleDoors;
+    private double lightVehicleUnits;
+    private int protoMecheBays;
+    private int protoMechDoors;
+    private double protoMechUnits;
+    private int battleArmorBays;
+    private int battleArmorDoors;
+    private double battleArmorUnits;
+    private int infantryBays;
+    private int infantryDoors;
+    private double infantryUnits;
+    private int superHeavyVehicleBays;
+    private int superHeavyVehicleDoors;
+    private double superHeavyVehicleUnits;
+    private int dropshuttleBays;
+    private int dropshuttleDoors;
+    private double dropshuttelUnits;
+    private int battleArmorHandles;
+    private double cargoBayUnits;
+    private int navalRepairFacilities;
 
     /** For BattleArmor, we want to know the weight of an individual suit. */
     private double twSuitTons;
@@ -92,6 +141,29 @@ public class MechSummary implements Serializable {
     /** The number of times the piece of equipment in the corresponding equipmentNames list appears. */
     private Vector<Integer> equipmentQuantities;
 
+    private String quirkNames;
+    private String weaponQuirkNames;
+
+    // AlphaStrike values
+    private int pointValue = 0;
+    private ASUnitType asUnitType = ASUnitType.UNKNOWN;
+    private int size = 0;
+    private int tmm = 0;
+    private Map<String, Integer> movement = new LinkedHashMap<>();
+    private String primaryMovementMode = "";
+    private ASDamageVector standardDamage = ASDamageVector.ZERO;
+    private int overheat = 0;
+    private ASArcSummary frontArc = new ASArcSummary();
+    private ASArcSummary leftArc = new ASArcSummary();
+    private ASArcSummary rightArc = new ASArcSummary();
+    private ASArcSummary rearArc = new ASArcSummary();
+    private int threshold;
+    private int fullArmor;
+    private int fullStructure;
+    private int squadSize;
+    private ASSpecialAbilityCollection specialAbilities = new ASSpecialAbilityCollection();
+    private UnitRole role;
+
     public MechSummary() {
         armorTypeSet = new HashSet<>();
     }
@@ -100,14 +172,17 @@ public class MechSummary implements Serializable {
         return name;
     }
 
+    @Override
     public String getChassis() {
         return chassis;
     }
 
+    @Override
     public String getModel() {
         return model;
     }
 
+    @Override
     public int getMulId() {
         return mulId;
     }
@@ -170,6 +245,26 @@ public class MechSummary implements Serializable {
         return sourceFile;
     }
 
+    public boolean getInvalid() {
+        return invalid;
+    }
+
+    public String getTechLevel() {
+        return techLevel;
+    }
+
+    public String getTechBase() {
+        return techBase;
+    }
+
+    public boolean getFailedToLoadEquipment() {
+        return failedToLoadEquipment;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
     public String getEntryName() {
         return entryName;
     }
@@ -198,6 +293,170 @@ public class MechSummary implements Serializable {
 
     public String getFullAccurateUnitType() {
         return fullAccurateUnitType;
+    }
+
+    public long getEntityType() {
+        return entityType;
+    }
+
+    public boolean getOmni() {
+        return omni;
+    }
+
+    public boolean getMilitary() {
+        return military;
+    }
+
+    public int getTankTurrets() {
+        return tankTurrets;
+    }
+
+    public int getLowerArms() {
+        return lowerArms;
+    }
+
+    public int getHands() {
+        return hands;
+    }
+
+    public double getTroopCarryingSpace() {
+        return troopCarryingSpace;
+    }
+
+    public int getASFBays() {
+        return aSFBays;
+    }
+
+    public int getASFDoors() {
+        return aSFDoors;
+    }
+
+    public double getASFUnits() {
+        return aSFUnits;
+    }
+
+    public int getSmallCraftBays() {
+        return smallCraftBays;
+    }
+
+    public int getSmallCraftDoors() {
+        return smallCraftDoors;
+    }
+
+    public double getSmallCraftUnits() {
+        return smallCraftUnits;
+    }
+
+    public int getDockingCollars() {
+        return dockingCollars;
+    }
+
+    public int getMechBays() {
+        return mechBays;
+    }
+
+    public int getMechDoors() {
+        return mechDoors;
+    }
+
+    public double getMechUnits() {
+        return mechUnits;
+    }
+
+    public int getHeavyVehicleBays() {
+        return heavyVehicleBays;
+    }
+
+    public int getHeavyVehicleDoors() {
+        return heavyVehicleDoors;
+    }
+
+    public double getHeavyVehicleUnits() {
+        return heavyVehicleUnits;
+    }
+
+    public int getLightVehicleBays() {
+        return lightVehicleBays;
+    }
+
+    public int getLightVehicleDoors() {
+        return lightVehicleDoors;
+    }
+
+    public double getLightVehicleUnits() {
+        return lightVehicleUnits;
+    }
+
+    public int getProtoMecheBays() {
+        return protoMecheBays;
+    }
+
+    public int getProtoMechDoors() {
+        return protoMechDoors;
+    }
+
+    public double getProtoMechUnits() {
+        return protoMechUnits;
+    }
+
+    public int getBattleArmorBays() {
+        return battleArmorBays;
+    }
+
+    public int getBattleArmorDoors() {
+        return battleArmorDoors;
+    }
+
+    public double getBattleArmorUnits() {
+        return battleArmorUnits;
+    }
+
+    public int getInfantryBays() {
+        return infantryBays;
+    }
+
+    public int getInfantryDoors() {
+        return infantryDoors;
+    }
+
+    public double getInfantryUnits() {
+        return infantryUnits;
+    }
+
+    public int getSuperHeavyVehicleBays() {
+        return superHeavyVehicleBays;
+    }
+
+    public int getSuperHeavyVehicleDoors() {
+        return superHeavyVehicleDoors;
+    }
+
+    public double getSuperHeavyVehicleUnits() {
+        return superHeavyVehicleUnits;
+    }
+
+    public int getDropshuttleBays() {
+        return dropshuttleBays;
+    }
+
+    public int getDropshuttleDoors() {
+        return dropshuttleDoors;
+    }
+
+    public double getDropshuttelUnits() {
+        return dropshuttelUnits;
+    }
+
+    public int getBattleArmorHandles() {
+        return battleArmorHandles;
+    }
+
+    public double getCargoBayUnits() {
+        return cargoBayUnits;
+    }
+
+    public int getNavalRepairFacilities() {
+        return navalRepairFacilities;
     }
 
     public double getTons() {
@@ -260,9 +519,262 @@ public class MechSummary implements Serializable {
             return String.valueOf(TechConstants.T_SIMPLE_EXPERIMENTAL + 1);
         }
     }
-    
+
+    @Override
+    public int getPointValue() {
+        return pointValue;
+    }
+
+    @Override
+    public ASUnitType getASUnitType() {
+        return asUnitType;
+    }
+
+    @Override
+    public int getSize() {
+        return size;
+    }
+
+    @Override
+    public int getTMM() {
+        return tmm;
+    }
+
+    @Override
+    public Map<String, Integer> getMovement() {
+        return movement;
+    }
+
+    @Override
+    public String getPrimaryMovementMode() {
+        return primaryMovementMode;
+    }
+
+    @Override
+    public ASDamageVector getStandardDamage() {
+        return standardDamage;
+    }
+
+    @Override
+    public int getOV() {
+        return overheat;
+    }
+
+    @Override
+    public ASArcSummary getFrontArc() {
+        return frontArc;
+    }
+
+    @Override
+    public ASArcSummary getLeftArc() {
+        return leftArc;
+    }
+
+    @Override
+    public ASArcSummary getRightArc() {
+        return rightArc;
+    }
+
+    @Override
+    public ASArcSummary getRearArc() {
+        return rearArc;
+    }
+
+    @Override
+    public int getThreshold() {
+        return threshold;
+    }
+
+    @Override
+    public int getFullArmor() {
+        return fullArmor;
+    }
+
+    @Override
+    public int getFullStructure() {
+        return fullStructure;
+    }
+
+    @Override
+    public int getSquadSize() {
+        return squadSize;
+    }
+
+    @Override
+    public ASSpecialAbilityCollection getSpecialAbilities() {
+        return specialAbilities;
+    }
+
+    @Override
+    public UnitRole getRole() {
+        return role;
+    }
+
     public void setFullAccurateUnitType(String type) {
         fullAccurateUnitType = type;
+    }
+
+    public void setEntityType(long type) {
+        entityType = type;
+    }
+
+    public void setOmni(boolean b) {
+        omni = b;
+    }
+
+    public void setMilitary(boolean b) {
+        military = b;
+    }
+
+    public void setTankTurrets(int i) {
+        tankTurrets = i;
+    }
+
+    public void setLowerArms(int i) {
+        lowerArms = i;
+    }
+
+    public void setHands(int i) {
+        hands = i;
+    }
+
+    public void setTroopCarryingSpace(double d) {
+        troopCarryingSpace = d;
+    }
+
+    public void setASFBays(int i) {
+        aSFBays = i;
+    }
+
+    public void setASFDoors(int i) {
+        aSFDoors = i;
+    }
+
+    public void setASFUnits(double d) {
+        aSFUnits = d;
+    }
+
+    public void setSmallCraftBays(int i) {
+        smallCraftBays = i;
+    }
+
+    public void setSmallCraftDoors(int i) {
+        smallCraftDoors = i;
+    }
+
+    public void setSmallCraftUnits(double d) {
+        smallCraftUnits = d;
+    }
+
+    public void setDockingCollars(int i) {
+        dockingCollars = i;
+    }
+
+    public void setMechBays(int i) {
+        mechBays = i;
+    }
+
+    public void setMechDoors(int i) {
+        mechDoors = i;
+    }
+
+    public void setMechUnits(double d) {
+        mechUnits = d;
+    }
+
+    public void setHeavyVehicleBays(int i) {
+        heavyVehicleBays = i;
+    }
+
+    public void setHeavyVehicleDoors(int i) {
+        heavyVehicleDoors = i;
+    }
+
+    public void setHeavyVehicleUnits(double d) {
+        heavyVehicleUnits = d;
+    }
+
+    public void setLightVehicleBays(int i) {
+        lightVehicleBays = i;
+    }
+
+    public void setLightVehicleDoors(int i) {
+        lightVehicleDoors = i;
+    }
+
+    public void setLightVehicleUnits(double d) {
+        lightVehicleUnits = d;
+    }
+
+    public void setProtoMecheBays(int i) {
+        protoMecheBays = i;
+    }
+
+    public void setProtoMechDoors(int i) {
+        protoMechDoors = i;
+    }
+
+    public void setProtoMechUnits(double d) {
+        protoMechUnits = d;
+    }
+
+    public void setBattleArmorBays(int i) {
+        battleArmorBays = i;
+    }
+
+    public void setBattleArmorDoors(int i) {
+        battleArmorDoors = i;
+    }
+
+    public void setBattleArmorUnits(double d) {
+        battleArmorUnits = d;
+    }
+
+    public void setInfantryBays(int i) {
+        infantryBays = i;
+    }
+
+    public void setInfantryDoors(int i) {
+        infantryDoors = i;
+    }
+
+    public void setInfantryUnits(double d) {
+        infantryUnits = d;
+    }
+
+    public void setSuperHeavyVehicleBays(int i) {
+        superHeavyVehicleBays = i;
+    }
+
+    public void setSuperHeavyVehicleDoors(int i) {
+        superHeavyVehicleDoors = i;
+    }
+
+    public void setSuperHeavyVehicleUnits(double d) {
+        superHeavyVehicleUnits = d;
+    }
+
+    public void setDropshuttleBays(int i) {
+        dropshuttleBays = i; }
+
+    public void setDropshuttleDoors(int i) {
+        dropshuttleDoors = i;
+    }
+
+    public void setDropshuttelUnits(double d) {
+        dropshuttelUnits = d;
+    }
+
+    public void setBattleArmorHandles(int i) {
+        battleArmorHandles = i;
+    }
+
+    public void setCargoBayUnits(double d) {
+        cargoBayUnits = d;
+    }
+
+    public void setNavalRepairFacilities(int i) {
+        navalRepairFacilities = i;
     }
 
     public void setName(String sName) {
@@ -287,6 +799,26 @@ public class MechSummary implements Serializable {
 
     public void setSourceFile(File sSourceFile) {
         this.sourceFile = sSourceFile;
+    }
+
+    public void setInvalid(boolean b) {
+        this.invalid = b;
+    }
+
+    public void setTechLevel(String s) {
+        this.techLevel = s;
+    }
+
+    public void setTechBase(String s) {
+        this.techBase = s;
+    }
+
+    public void setFailedToLoadEquipment(boolean b) {
+        this.failedToLoadEquipment = b;
+    }
+
+    public void setSource(String sSource) {
+        this.source = sSource;
     }
 
     public void setEntryName(String sEntryName) {
@@ -348,7 +880,7 @@ public class MechSummary implements Serializable {
     public void setStandardYear(int year) {
         stdTechYear = year;
     }
-    
+
     public void setCanon(boolean canon) {
         this.canon = canon;
     }
@@ -435,6 +967,55 @@ public class MechSummary implements Serializable {
     
     public Vector<Integer> getEquipmentQuantities() {
         return equipmentQuantities;
+    }
+
+    public void setQuirkNames(Quirks quirks) {
+        quirkNames = "";
+        for (final Enumeration<IOptionGroup> optionGroups = quirks.getGroups(); optionGroups.hasMoreElements();) {
+            final IOptionGroup group = optionGroups.nextElement();
+            for (final Enumeration<IOption> options = group.getOptions(); options.hasMoreElements(); ) {
+                final IOption option = options.nextElement();
+                if ((option != null) && option.booleanValue()) {
+                    if (!quirkNames.contains(option.getDisplayableNameWithValue())) {
+                        quirkNames += option.getDisplayableNameWithValue() + ";";
+                    }
+                }
+            }
+        }
+    }
+
+    public String getQuirkNames() {
+        return quirkNames;
+    }
+
+    public void setWeaponQuirkNames(Entity entity) {
+        HashMap<Integer, WeaponQuirks> wpnQks = new HashMap<>();
+        weaponQuirkNames = "";
+        for (Mounted m : entity.getWeaponList()) {
+            wpnQks.put(entity.getEquipmentNum(m), m.getQuirks());
+        }
+        Set<Integer> set = wpnQks.keySet();
+
+        Iterator<Integer> iter = set.iterator();
+        while (iter.hasNext()) {
+            int key = iter.next();
+            WeaponQuirks wpnQuirks = wpnQks.get(key);
+            for (Enumeration<IOptionGroup> i = wpnQuirks.getGroups(); i.hasMoreElements(); ) {
+                IOptionGroup group = i.nextElement();
+                for (Enumeration<IOption> j = group.getSortedOptions(); j.hasMoreElements(); ) {
+                    IOption option = j.nextElement();
+                    if ((option != null) && option.booleanValue()) {
+                        if (!weaponQuirkNames.contains(option.getDisplayableNameWithValue())) {
+                            weaponQuirkNames += option.getDisplayableNameWithValue() + ";";
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public String getWeaponQuirkNames() {
+        return weaponQuirkNames;
     }
 
     public void setTotalArmor(int totalArmor) {
@@ -533,10 +1114,82 @@ public class MechSummary implements Serializable {
     public void setSuitWeight(double suitWeight) {
         this.suitWeight = suitWeight;
     }
-    
+
 	public String getExtinctRange() {
 		return extinctRange;
 	}
+
+    public void setAsUnitType(ASUnitType asUnitType) {
+        this.asUnitType = asUnitType;
+    }
+
+    public void setSize(int size) {
+        this.size = size;
+    }
+
+    public void setTmm(int tmm) {
+        this.tmm = tmm;
+    }
+
+    public void setMovement(Map<String, Integer> movement) {
+        this.movement = movement;
+    }
+
+    public void setPrimaryMovementMode(String primaryMovementMode) {
+        this.primaryMovementMode = primaryMovementMode;
+    }
+
+    public void setStandardDamage(ASDamageVector standardDamage) {
+        this.standardDamage = standardDamage;
+    }
+
+    public void setOverheat(int overheat) {
+        this.overheat = overheat;
+    }
+
+    public void setFrontArc(ASArcSummary frontArc) {
+        this.frontArc = frontArc;
+    }
+
+    public void setLeftArc(ASArcSummary leftArc) {
+        this.leftArc = leftArc;
+    }
+
+    public void setRightArc(ASArcSummary rightArc) {
+        this.rightArc = rightArc;
+    }
+
+    public void setRearArc(ASArcSummary rearArc) {
+        this.rearArc = rearArc;
+    }
+
+    public void setThreshold(int threshold) {
+        this.threshold = threshold;
+    }
+
+    public void setFullArmor(int fullArmor) {
+        this.fullArmor = fullArmor;
+    }
+
+    public void setFullStructure(int fullStructure) {
+        this.fullStructure = fullStructure;
+    }
+
+    public void setSquadSize(int squadSize) {
+        this.squadSize = squadSize;
+    }
+
+    public void setPointValue(int pointValue) {
+        this.pointValue = pointValue;
+    }
+
+    public void setSpecialAbilities(ASSpecialAbilityCollection specialAbilities) {
+        this.specialAbilities = specialAbilities;
+    }
+
+    public void setUnitRole(UnitRole role) {
+        this.role = role;
+    }
 
 	public void setExtinctRange(String extinctRange) {
 		this.extinctRange = extinctRange;
@@ -561,5 +1214,13 @@ public class MechSummary implements Serializable {
         return Objects.hash(chassis, model, unitType, sourceFile);
     }
 
+    @Override
+    public boolean showSUA(BattleForceSUA sua) {
+        return !AlphaStrikeHelper.hideSpecial(sua, this);
+    }
 
+    @Override
+    public String formatSUA(BattleForceSUA sua, String delimiter, ASSpecialAbilityCollector collection) {
+        return AlphaStrikeHelper.formatAbility(sua, collection, this, delimiter);
+    }
 }

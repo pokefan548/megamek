@@ -17,9 +17,7 @@ import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.battlevalue.AeroBVCalculator;
 import megamek.common.cost.AeroCostCalculator;
 import megamek.common.enums.AimingMode;
-import megamek.common.enums.GamePhase;
 import megamek.common.options.OptionsConstants;
-import megamek.common.weapons.bayweapons.BayWeapon;
 import org.apache.logging.log4j.LogManager;
 
 import java.text.NumberFormat;
@@ -351,9 +349,13 @@ public class Aero extends Entity implements IAero, IBomber {
             if (weatherMod != 0) {
                 j = Math.max(j + weatherMod, 0);
             }
+            if (getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_WIND)
+                    && (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WI_TORNADO_F13)) {
+                j += 1;
+            }
         }
         // get bomb load
-        j = Math.max(0, j - (int) Math.ceil(getBombPoints() / 5.0));
+        j = reduceMPByBombLoad(j);
 
         if (hasModularArmor()) {
             j--;
@@ -391,7 +393,7 @@ public class Aero extends Entity implements IAero, IBomber {
             }
         }
         // get bomb load
-        j = Math.max(0, j - (int) Math.ceil(getBombPoints() / 5.0));
+        j = reduceMPByBombLoad(j);
 
         if (hasModularArmor()) {
             j--;
@@ -519,6 +521,11 @@ public class Aero extends Entity implements IAero, IBomber {
     @Override
     public void clearBombChoices() {
         Arrays.fill(bombChoices, 0);
+    }
+
+    @Override
+    public int reduceMPByBombLoad(int t) {
+        return Math.max(0, t - (int) Math.ceil(getBombPoints() / 5.0));
     }
 
     public void setWhoFirst() {
@@ -2055,6 +2062,11 @@ public class Aero extends Entity implements IAero, IBomber {
     }
 
     @Override
+    public boolean isNightwalker() {
+        return false;
+    }
+
+    @Override
     public boolean isSpheroid() {
         return spheroid;
     }
@@ -2297,7 +2309,7 @@ public class Aero extends Entity implements IAero, IBomber {
         // capital fighters can load other capital fighters (becoming squadrons)
         // but not in the deployment phase
         if (isCapitalFighter() && !unit.isEnemyOf(this) && unit.isCapitalFighter() && (getId() != unit.getId())
-                && (game.getPhase() != GamePhase.DEPLOYMENT)) {
+                && !getGame().getPhase().isDeployment()) {
             return true;
         }
 
@@ -2447,112 +2459,6 @@ public class Aero extends Entity implements IAero, IBomber {
     @Override
     public boolean canGoDown() {
         return canGoDown(altitude, getPosition());
-    }
-
-    @Override
-    public void setAlphaStrikeMovement(Map<String, Integer> moves) {
-        moves.put(getMovementModeAsBattleForceString(), getWalkMP());
-    }
-
-    @Override
-    public int getBattleForceArmorPoints() {
-        if (isCapitalFighter()) {
-            return (int) Math.round(getCapArmor() / 3.0);
-        }
-        return super.getBattleForceArmorPoints();
-    }
-
-    @Override
-    public String getBattleForceDamageThresholdString() {
-        return "-" + (int) Math.ceil(getBattleForceArmorPoints() / 10.0);
-    }
-
-    @Override
-    public int getBattleForceStructurePoints() {
-        return (int) Math.ceil(getSI() * 0.50);
-    }
-
-    @Override
-    public int getNumBattleForceWeaponsLocations() {
-        return 2;
-    }
-
-    @Override
-    public double getBattleForceLocationMultiplier(int index, int location, boolean rearMounted) {
-        if ((index == 0 && location != LOC_AFT && !rearMounted)
-                || (index == 1 && (location == LOC_AFT || rearMounted))) {
-            return 1.0;
-        }
-        return 0;
-    }
-
-    @Override
-    public String getBattleForceLocationName(int index) {
-        if (index == 1) {
-            return "REAR";
-        }
-        return "";
-    }
-
-    /**
-     * We need to check whether the weapon is mounted in LOC_AFT in addition to
-     * isRearMounted()
-     */
-    @Override
-    public int getBattleForceTotalHeatGeneration(boolean allowRear) {
-        int totalHeat = 0;
-
-        for (Mounted mount : getWeaponList()) {
-            WeaponType weapon = (WeaponType) mount.getType();
-            if (weapon instanceof BayWeapon) {
-                for (int index : mount.getBayWeapons()) {
-                    totalHeat += ((WeaponType) (getEquipment(index).getType())).getHeat();
-                }
-            }
-            if (weapon.hasFlag(WeaponType.F_ONESHOT)
-                    || (allowRear && !mount.isRearMounted() && mount.getLocation() != LOC_AFT)
-                    || (!allowRear && (mount.isRearMounted() || mount.getLocation() == LOC_AFT))) {
-                continue;
-            }
-            totalHeat += weapon.getHeat();
-        }
-
-        return totalHeat;
-    }
-
-    @Override
-    public int getBattleForceTotalHeatGeneration(int location) {
-        int totalHeat = 0;
-
-        for (Mounted mount : getWeaponList()) {
-            WeaponType weapon = (WeaponType) mount.getType();
-            if (weapon.hasFlag(WeaponType.F_ONESHOT)
-                    || getBattleForceLocationMultiplier(location, mount.getLocation(), mount.isRearMounted()) == 0) {
-                continue;
-            }
-            totalHeat += weapon.getHeat();
-        }
-
-        return totalHeat;
-    }
-
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA, Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        for (Mounted m : getEquipment()) {
-            if (m.getType().hasFlag(MiscType.F_SPACE_MINE_DISPENSER)) {
-                specialAbilities.merge(BattleForceSPA.MDS, 1, Integer::sum);
-            }
-        }
-        if ((getEntityType() & (ETYPE_SMALL_CRAFT | ETYPE_JUMPSHIP | ETYPE_FIXED_WING_SUPPORT)) == 0) {
-            specialAbilities.put(BattleForceSPA.BOMB, getWeightClass() + 1);
-        }
-        if ((getEntityType() & (ETYPE_JUMPSHIP | ETYPE_CONV_FIGHTER)) == 0) {
-            specialAbilities.put(BattleForceSPA.SPC, null);
-        }
-        if (isVSTOL()) {
-            specialAbilities.put(BattleForceSPA.VSTOL, null);
-        }
     }
 
     @Override
@@ -3133,6 +3039,16 @@ public class Aero extends Entity implements IAero, IBomber {
     }
 
     @Override
+    public boolean isFighter() {
+        return true;
+    }
+
+    @Override
+    public boolean isAerospaceFighter() {
+        return true;
+    }
+
+    @Override
     public int availableBombLocation(int cost) {
         return LOC_NOSE;
     }
@@ -3283,12 +3199,17 @@ public class Aero extends Entity implements IAero, IBomber {
     
     // autoejection methods
     /**
+     * @return unit has an ejection seat
+     */
+    public boolean hasEjectSeat() {
+        return !hasQuirk(OptionsConstants.QUIRK_NEG_NO_EJECT);
+    }
+
+    /**
      * @return Returns the autoEject.
      */
     public boolean isAutoEject() {
-        boolean hasEjectSeat = !hasQuirk(OptionsConstants.QUIRK_NEG_NO_EJECT);
-
-        return autoEject && hasEjectSeat;
+        return autoEject && hasEjectSeat();
     }
 
     /**

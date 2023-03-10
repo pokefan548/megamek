@@ -701,7 +701,7 @@ public class FireControl {
         if (targetState.isAirborneAero() && !shooterState.isAero()) {
 
             // If the aero is attacking me, there is no range.
-            if (target.getTargetId() == shooter.getId()) {
+            if (target.getId() == shooter.getId()) {
                 distance = 0;
             } else {
                 // Take into account altitude.
@@ -1286,7 +1286,7 @@ public class FireControl {
         } else if ((damageFraction < 0.5)
                 || (target.getTargetType() == Targetable.TYPE_BUILDING)
                    || (target.getTargetType() == Targetable.TYPE_HEX_CLEAR)
-                   || (owner.getGame().getEntity(target.getTargetId()) instanceof Infantry)) {
+                   || (owner.getGame().getEntity(target.getId()) instanceof Infantry)) {
             return 0;
         }
 
@@ -1830,7 +1830,6 @@ public class FireControl {
         final FiringPlan swarmAttack = new FiringPlan(target);
         final FiringPlan legAttack = new FiringPlan(target);
         final FiringPlan fieldGuns = new FiringPlan(target);
-        double fieldGunMassAlreadyFired = 0.0; //We need to track the tonnage of field guns being fired, because trying to fire more than the current possible total(# of men left) results in nothing being fired.
         for (final WeaponFireInfo weaponFireInfo : alphaStrike) {
 
             //Leg and swarm attacks can't be mixed with any other attacks, so we have to consider each of those separately.
@@ -1849,17 +1848,7 @@ public class FireControl {
                     continue;
                 } else if (!(shooter instanceof BattleArmor)
                         && (Infantry.LOC_FIELD_GUNS == weaponFireInfo.getWeapon().getLocation())) {
-                    final double fieldGunMass = weaponFireInfo.getWeapon().getTonnage();
-                    // Only fire field guns up until we no longer have the men to fire more, since
-                    // going over that limit results in nothing firing.
-                    // In theory, we could adapt the heat system to handle this (with tonnage as
-                    // heat and shooting strength as heat capacity, no heat tolerance). This would
-                    // behave much better for units with mixed type field guns, but given that those
-                    // are rare, this should serve for now.
-                    if (fieldGunMassAlreadyFired + fieldGunMass <= ((Infantry) shooter).getShootingStrength()) {
-                        fieldGuns.add(weaponFireInfo);
-                        fieldGunMassAlreadyFired += fieldGunMass;
-                    }
+                    fieldGuns.add(weaponFireInfo);
                     continue;
                 }
             }
@@ -2211,7 +2200,7 @@ public class FireControl {
         // otherwise, we still can't spot
         if (!closestTargets.isEmpty()) {
             Targetable target = closestTargets.get(Compute.randomInt(closestTargets.size()));
-            return new SpotAction(spotter.getId(), target.getTargetId());
+            return new SpotAction(spotter.getId(), target.getId());
         }
 
         return null;
@@ -2300,16 +2289,16 @@ public class FireControl {
         // Loop through each enemy and find the best plan for attacking them.
         for (final Targetable enemy : enemies) {
 
-            if (owner.getBehaviorSettings().getIgnoredUnitTargets().contains(enemy.getTargetId())) {
+            if (owner.getBehaviorSettings().getIgnoredUnitTargets().contains(enemy.getId())) {
                 LogManager.getLogger().info(enemy.getDisplayName() + " is being explicitly ignored");
                 continue;
             }
             
-            final boolean priorityTarget = owner.getPriorityUnitTargets().contains(enemy.getTargetId());
+            final boolean priorityTarget = owner.getPriorityUnitTargets().contains(enemy.getId());
 
             // Skip retreating enemies so long as they haven't fired on me while retreating.
             final int playerId = (enemy instanceof Entity) ? ((Entity) enemy).getOwnerId() : -1;
-            if (!priorityTarget && honorUtil.isEnemyBroken(enemy.getTargetId(), playerId,
+            if (!priorityTarget && honorUtil.isEnemyBroken(enemy.getId(), playerId,
                                                            owner.getForcedWithdrawal())) {
                 LogManager.getLogger().info(enemy.getDisplayName() + " is broken - ignoring");
                 continue;
@@ -2431,6 +2420,7 @@ public class FireControl {
             }
             final WeaponAttackAction action = info.getAction();
             action.setAmmoId(shooter.getEquipmentNum(mountedAmmo));
+            action.setAmmoMunitionType(((AmmoType) mountedAmmo.getType()).getMunitionType());
             action.setAmmoCarrier(mountedAmmo.getEntity().getId());
             info.setAction(action);
             owner.sendAmmoChange(info.getShooter().getId(), shooter.getEquipmentNum(currentWeapon),
@@ -3193,7 +3183,7 @@ public class FireControl {
         }
         
         if (bestTarget != null) {
-            SearchlightAttackAction slaa = new SearchlightAttackAction(shooter.getId(), bestTarget.getTargetType(), bestTarget.getTargetId());
+            SearchlightAttackAction slaa = new SearchlightAttackAction(shooter.getId(), bestTarget.getTargetType(), bestTarget.getId());
             return slaa;
         }
         

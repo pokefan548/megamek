@@ -19,7 +19,6 @@ import megamek.common.options.OptionsConstants;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 /**
  * @author Andrew Hunter VTOLs are helicopters (more or less.)
@@ -275,6 +274,12 @@ public class VTOL extends Tank implements IBomber {
     }
 
     @Override
+    public int reduceMPByBombLoad(int t) {
+        // Per TacOps errata v3.0, movement reduction is per bomb rather than per 5 bomb points
+        return Math.max(0, (t - (int) this.getBombs().stream().filter(m -> (m.getUsableShotsLeft() > 0)).count()));
+    }
+
+    @Override
     public Targetable getVTOLBombTarget() {
         return bombTarget;
     }
@@ -291,6 +296,11 @@ public class VTOL extends Tank implements IBomber {
     @Override
     public boolean isMakingVTOLGroundAttack() {
         return bombTarget != null || !strafingCoords.isEmpty();
+    }
+
+    @Override
+    public boolean isNightwalker() {
+        return false;
     }
 
     @Override
@@ -576,6 +586,20 @@ public class VTOL extends Tank implements IBomber {
             if (weatherMod != 0) {
                 j = Math.max(j + weatherMod, 0);
             }
+
+            if (getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_SNOW)) {
+                if (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM) {
+                    j += 2;
+                }
+
+                if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_SLEET)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_LIGHT_SNOW)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_MOD_SNOW)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_HEAVY_SNOW)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_SNOW_FLURRIES)) {
+                    j += 1;
+                }
+            }
         }
 
         if (!ignoremodulararmor && hasModularArmor()) {
@@ -585,15 +609,7 @@ public class VTOL extends Tank implements IBomber {
             j--;
         }
 
-        // Per TacOps errata v3.0, movement reduction is per bomb rather than per 5 bomb points
-        for (Mounted m : getBombs()) {
-            if (m.getUsableShotsLeft() > 0) {
-                j--;
-            }
-        }
-        if (j < 0) {
-            j = 0;
-        }
+        j = reduceMPByBombLoad(j);
 
         if (gravity) {
             j = applyGravityEffectsOnMP(j);
@@ -625,35 +641,6 @@ public class VTOL extends Tank implements IBomber {
         }
     }
 
-    @Override
-    public double getBaseBattleForceMovement() {
-        double move = getOriginalWalkMP();
-
-        if (getMisc().stream().anyMatch(m -> m.getType().hasFlag(MiscType.F_JET_BOOSTER))) {
-            move *= 1.25;
-        }
-
-        return move;
-    }
-    
-    @Override
-    public double getBattleForceLocationMultiplier(int index, int location, boolean rearMounted) {
-        if (index == 1 && location == LOC_REAR) {
-            return 1.0;
-        } else if (location == LOC_REAR || location == LOC_BODY || location == LOC_ROTOR
-                || (index == 0 && location >= LOC_TURRET)
-                || (index == 1 && location < LOC_TURRET)) {
-            return 0.0;
-        }
-        return 1.0; 
-    }
-
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        specialAbilities.put(BattleForceSPA.ATMO, null);
-    }
-    
     @Override
     public long getEntityType() {
         return Entity.ETYPE_TANK | Entity.ETYPE_VTOL;

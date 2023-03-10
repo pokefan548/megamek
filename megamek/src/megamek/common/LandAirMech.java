@@ -157,8 +157,6 @@ public class LandAirMech extends BipedMech implements IAero, IBomber {
         }
 
         previousMovementMode = movementMode;
-        setFuel(80);
-
         setCrew(new LAMPilot(this));
     }
 
@@ -397,6 +395,11 @@ public class LandAirMech extends BipedMech implements IAero, IBomber {
             int weatherMod = game.getPlanetaryConditions().getMovementMods(this);
             if (weatherMod != 0) {
                 j = Math.max(j + weatherMod, 0);
+            }
+
+            if(getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_WIND)
+                    && (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WI_TORNADO_F13)) {
+                j += 1;
             }
         }
         return j;
@@ -1128,6 +1131,12 @@ public class LandAirMech extends BipedMech implements IAero, IBomber {
     }
 
     @Override
+    public int reduceMPByBombLoad(int t) {
+        // bombs don't impact movement
+        return t;
+    }
+
+    @Override
     public Targetable getVTOLBombTarget() {
         return airmechBombTarget;
     }
@@ -1140,6 +1149,15 @@ public class LandAirMech extends BipedMech implements IAero, IBomber {
     @Override
     public boolean isMakingVTOLGroundAttack() {
         return airmechBombTarget != null;
+    }
+
+    @Override
+    public boolean isNightwalker() {
+        if (isAirborne()) {
+            return false;
+        } else {
+            return getCrew().getOptions().booleanOption(OptionsConstants.PILOT_TM_NIGHTWALKER);
+        }
     }
 
     @Override
@@ -1909,34 +1927,6 @@ public class LandAirMech extends BipedMech implements IAero, IBomber {
             }
         }
         applyDamage();
-    }
-
-    @Override
-    public void setBattleForceMovement(Map<String, Integer> movement) {
-        super.setBattleForceMovement(movement);
-        movement.put("g", getAirMechCruiseMP(true, false));
-        movement.put("a", getFighterModeWalkMP(true, false));
-    }
-
-    @Override
-    public void setAlphaStrikeMovement(Map<String, Integer> movement) {
-        super.setBattleForceMovement(movement);
-        movement.put("g", getAirMechCruiseMP(true, false) * 2);
-        movement.put("a", getFighterModeWalkMP(true, false));
-    }
-
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA, Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        int bombs = (int) getEquipment().stream().filter(m -> m.getType().hasFlag(MiscType.F_BOMB_BAY)).count();
-        if (bombs > 0) {
-            specialAbilities.put(BattleForceSPA.BOMB, bombs / 5);
-        }
-        if (lamType == LAM_BIMODAL) {
-            specialAbilities.put(BattleForceSPA.BIM, null);
-        } else {
-            specialAbilities.put(BattleForceSPA.LAM, null);
-        }
     }
 
     @Override

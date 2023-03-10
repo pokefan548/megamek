@@ -20,6 +20,7 @@
  */
 package megamek.client.ui.swing.minimap;
 
+import megamek.MMConstants;
 import megamek.client.Client;
 import megamek.client.event.BoardViewEvent;
 import megamek.client.event.BoardViewListener;
@@ -33,7 +34,6 @@ import megamek.common.actions.AttackAction;
 import megamek.common.actions.EntityAction;
 import megamek.common.actions.WeaponAttackAction;
 import megamek.common.annotations.Nullable;
-import megamek.common.enums.GamePhase;
 import megamek.common.event.*;
 import megamek.common.preference.IPreferenceChangeListener;
 import megamek.common.preference.PreferenceChangeEvent;
@@ -57,9 +57,7 @@ import java.io.StreamTokenizer;
 import java.util.List;
 import java.util.*;
 
-import static megamek.client.ui.swing.minimap.MinimapUnitSymbols.STRAT_BASERECT;
-import static megamek.client.ui.swing.minimap.MinimapUnitSymbols.STRAT_CX;
-import static megamek.client.ui.swing.minimap.MinimapUnitSymbols.STRAT_SYMBOLSIZE;
+import static megamek.client.ui.swing.minimap.MinimapUnitSymbols.*;
 import static megamek.common.Terrains.*;
 
 /**
@@ -86,6 +84,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
     private static final int[] HALF_ROAD_WIDTH = {0, 0, 0, 1, 2, 3, 3};
     private static final int[] UNIT_SIZES = {4, 5, 6, 7, 8, 9, 10};
     private static final int[] UNIT_SCALE = {7, 8, 9, 11, 12, 14, 16};
+    private static final int MIM_ZOOM = 0;
     private static final int MAX_ZOOM = HEX_SIDE.length - 1;
     
     private static final int SHOW_NO_HEIGHT = 0;
@@ -125,7 +124,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
     /** A list of information on hexes with roads or bridges. */
     private final List<int[]> roadHexes = new ArrayList<>();
     private int zoom = GUIP.getMinimapZoom();
-    private int heightDisplayMode = SHOW_NO_HEIGHT;
+    private int heightDisplayMode = GUIP.getMinimapHeightDisplayMode();
     
     private Coords firstLOS;
     private Coords secondLOS;
@@ -162,7 +161,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
                 GUIP.setMinimapEnabled(false);
             }
         });
-        
+
         result.add(new Minimap(result, game, bv, cg));
         result.pack();
         return result;
@@ -509,8 +508,8 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
                     }
                     addRoadElements(h, j, k);
                     // Color invalid hexes red when in the Map Editor
-                    if ((game != null) && (game.getPhase() == GamePhase.UNKNOWN) && !h.isValid(null)) {
-                        gg.setColor(GUIPreferences.getInstance().getWarningColor());
+                    if ((game != null) && game.getPhase().isUnknown() && !h.isValid(null)) {
+                        gg.setColor(GUIP.getWarningColor());
                         paintCoord(gg, j, k, true);
                     }
                 }
@@ -570,8 +569,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
     
     /** Indicates the deployment hexes. */
     private void drawDeploymentZone(Graphics g) {
-        if ((null != client) && (null != game) 
-                && (GamePhase.DEPLOYMENT == game.getPhase()) && (dialog != null) 
+        if ((null != client) && (null != game) && game.getPhase().isDeployment() && (dialog != null)
                 && (bv.getDeployingEntity() != null)) {
             GameTurn turn = game.getTurn();
             if ((turn != null) && (turn.getPlayerNum() == client.getLocalPlayer().getId())) {
@@ -711,7 +709,20 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
                     default:
                         label = "";
                 }
-                g.drawString(label, 17, y0 + 12);
+                g.drawString(label, 17, y0 + 11);
+
+                // map size
+                int width = getFontMetrics(g.getFont()).stringWidth(label);
+                String mapSize = board.getWidth() + " " + Messages.getString("Minimap.X") + " " + board.getHeight();
+                int x = 24 + width;
+                g.drawString(mapSize, x, y0 + 11);
+                width = getFontMetrics(g.getFont()).stringWidth(mapSize);
+                x += width + 3;
+                g.setColor(Color.black);
+                g.drawLine(x, y0, x, h);
+                x += 1;
+                g.setColor(Color.green.darker());
+                g.drawLine(x, y0, x, h);
             }
         }
     }
@@ -731,10 +742,11 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
             height = (h.containsAnyTerrainOf(BUILDING, FUEL_TANK)) ? h.ceiling() : h.floor();
         }
         if (height != 0) {
+            String sHeight = ((height > -1) && (height < 10)) ? " " + height : height + "";
             int baseX = (x * (HEX_SIDE[zoom] + HEX_SIDE_BY_SIN30[zoom])) + leftMargin;
             int baseY = (((2 * y) + 1 + (x % 2)) * HEX_SIDE_BY_COS30[zoom]) + topMargin;
             g.setColor(Color.white);
-            g.drawString(height + "", baseX + 5, baseY + 5); 
+            g.drawString(sHeight, baseX + 5, baseY + 5);
         }
     }
     
@@ -896,7 +908,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
         if (EntityVisibilityUtils.onlyDetectedBySensors(bv.getLocalPlayer(), entity)) { 
             // This unit is visible only as a sensor Return
             String sensorReturn = "?";           
-            Font font = new Font("SansSerif", Font.BOLD, FONT_SIZE[zoom]);             
+            Font font = new Font(MMConstants.FONT_SANS_SERIF, Font.BOLD, FONT_SIZE[zoom]);
             int width = getFontMetrics(font).stringWidth(sensorReturn) / 2;
             int height = getFontMetrics(font).getHeight() / 2 - 2;
             g.setFont(font);
@@ -940,14 +952,12 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
         
         Path2D form = MinimapUnitSymbols.getForm(entity);
 
-        Color borderColor = Color.WHITE;
+        Color borderColor = entity.moved != EntityMovementType.MOVE_NONE ? Color.BLACK : Color.WHITE;
         Color fontColor = Color.BLACK;
-        if (entity.moved != EntityMovementType.MOVE_NONE) {
-            borderColor = Color.BLACK;
-        }
-
+        
         float outerBorderWidth = 30f;
-        float innerBorderWidth = 20f;
+        float innerBorderWidth = 10f;
+        float formStrokeWidth = 20f;
 
         if (stratOpsSymbols) {
             // White border to set off the icon from the background
@@ -959,15 +969,12 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
             g2.setColor(fontColor);
             g2.fill(STRAT_BASERECT);
 
-            // Rectangle border for all units
-            g2.setColor(borderColor);
-            g2.setStroke(new BasicStroke(innerBorderWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL));
-            g2.draw(STRAT_BASERECT);
-
             // Set a thin brush for filled areas (leave a thick brush for line symbols
             if ((entity instanceof Mech) || (entity instanceof Protomech)
                     || (entity instanceof VTOL) || (entity.isAero())) {
                 g2.setStroke(new BasicStroke(1f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+            } else {
+                g2.setStroke(new BasicStroke(formStrokeWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL));
             }
 
             // Fill the form in player color / team color
@@ -987,7 +994,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
                 }
                 if (!s.isBlank()) {
                     var fontContext = new FontRenderContext(null, true, true);
-                    var font = new Font("SansSerif", Font.BOLD, 100);
+                    var font = new Font(MMConstants.FONT_SANS_SERIF, Font.BOLD, 100);
                     FontMetrics currentMetrics = getFontMetrics(font);
                     int stringWidth = currentMetrics.stringWidth(s);
                     GlyphVector gv = font.createGlyphVector(fontContext, s);
@@ -1000,6 +1007,11 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
             }
             // Draw the unit icon in black
             g2.draw(form);
+
+            // Rectangle border for all units
+            g2.setColor(borderColor);
+            g2.setStroke(new BasicStroke(innerBorderWidth, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL));
+            g2.draw(STRAT_BASERECT);
 
         } else {
             // Standard symbols
@@ -1273,6 +1285,12 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
         }
     }
 
+    public void resetZoom() {
+        zoom = MIM_ZOOM;
+        initializeMap();
+        GUIP.setMinimapZoom(zoom);
+    }
+
     private void processMouseRelease(int x, int y, int modifiers) {
         if (!new Rectangle(getSize()).contains(x, y)) {
             return;
@@ -1298,6 +1316,7 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
                     zoomOut();
                 } else if ((x < 2 * BUTTON_HEIGHT) && (zoom > 3)) {
                     heightDisplayMode = ((++heightDisplayMode) > NBR_MODES) ? 0 : heightDisplayMode;
+                    GUIP.setMinimapHeightDisplayMode(heightDisplayMode);
                     initializeMap();
                 } else if (x > (getSize().width - BUTTON_HEIGHT)) {
                     zoomIn();
@@ -1343,10 +1362,12 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
     private final GameListener gameListener = new GameListenerAdapter() {
         @Override
         public void gamePhaseChange(GamePhaseChangeEvent e) {
-            if (GUIPreferences.getInstance().getGameSummaryMinimap() && ((e.getOldPhase() == GamePhase.DEPLOYMENT)
-                    || (e.getOldPhase() == GamePhase.MOVEMENT) || (e.getOldPhase() == GamePhase.TARGETING)
-                    || (e.getOldPhase() == GamePhase.PREMOVEMENT) || (e.getOldPhase() == GamePhase.PREFIRING)
-                    || (e.getOldPhase() == GamePhase.FIRING) || (e.getOldPhase() == GamePhase.PHYSICAL))) {
+            if (GUIP.getGameSummaryMinimap()
+                    && (e.getOldPhase().isDeployment() || e.getOldPhase().isMovement()
+                            || e.getOldPhase().isTargeting() || e.getOldPhase().isPremovement()
+                            || e.getOldPhase().isPrefiring() || e.getOldPhase().isFiring()
+                            || e.getOldPhase().isPhysical())) {
+
                 File dir = new File(Configuration.gameSummaryImagesMMDir(), game.getUUIDString());
                 if (!dir.exists()) {
                     dir.mkdirs();
@@ -1358,7 +1379,6 @@ public final class Minimap extends JPanel implements IPreferenceChangeListener {
                 } catch (Exception ex) {
                     LogManager.getLogger().error("", ex);
                 }
-
             }
             refreshMap();
         }

@@ -17,6 +17,7 @@ import megamek.client.ui.swing.calculationReport.CalculationReport;
 import megamek.common.battlevalue.CombatVehicleBVCalculator;
 import megamek.common.cost.CombatVehicleCostCalculator;
 import megamek.common.enums.AimingMode;
+import megamek.common.enums.GamePhase;
 import megamek.common.enums.MPBoosters;
 import megamek.common.options.OptionsConstants;
 import megamek.common.weapons.flamers.VehicleFlamerWeapon;
@@ -83,6 +84,13 @@ public class Tank extends Entity {
     public static final int CRIT_TURRET_LOCK = 13;
     public static final int CRIT_TURRET_DESTROYED = 14;
 
+    //Fortify terrain just like infantry
+    public static final int DUG_IN_NONE = 0;
+    public static final int DUG_IN_FORTIFYING1 = 1;
+    public static final int DUG_IN_FORTIFYING2 = 2;
+    public static final int DUG_IN_FORTIFYING3 = 3;
+    private int dugIn = DUG_IN_NONE;
+
     // tanks have no critical slot limitations
     private static final int[] NUM_OF_SLOTS = { 25, 25, 25, 25, 25, 25, 25 };
 
@@ -93,9 +101,9 @@ public class Tank extends Entity {
 
     private static String[] LOCATION_NAMES_DUAL_TURRET = { "Body", "Front",
             "Right", "Left", "Rear", "Rear Turret", "Front Turret" };
-    
+
     // maps ToHitData - SIDE_X constants to LOC_X constants here for hull down fixed side hit locations
-    protected static final Map<Integer, Integer> SIDE_LOC_MAPPING = 
+    protected static final Map<Integer, Integer> SIDE_LOC_MAPPING =
         Map.of(ToHitData.SIDE_FRONT, LOC_FRONT,
                 ToHitData.SIDE_LEFT, LOC_LEFT,
                 ToHitData.SIDE_RIGHT, LOC_RIGHT,
@@ -226,17 +234,17 @@ public class Tank extends Entity {
     public void setMotivePenalty(int p) {
         motivePenalty = p;
     }
-    
+
     private static final TechAdvancement TA_COMBAT_VEHICLE = new TechAdvancement(TECH_BASE_ALL)
             .setAdvancement(DATE_NONE, 2470, 2490).setProductionFactions(F_TH)
             .setTechRating(RATING_E).setAvailability(RATING_C, RATING_C, RATING_C, RATING_B)
             .setStaticTechLevel(SimpleTechLevel.INTRO);
-    
+
     @Override
     public TechAdvancement getConstructionTechAdvancement() {
         return TA_COMBAT_VEHICLE;
     }
-    
+
     //Advanced turrets
     public static TechAdvancement getDualTurretTA() {
         return new TechAdvancement(TECH_BASE_ALL)
@@ -253,7 +261,7 @@ public class Tank extends Entity {
             ctl.addComponent(getDualTurretTA());
         }
     }
-    
+
     /**
      * Returns this entity's walking/cruising mp, factored for heat, extreme
      * temperatures, and gravity.
@@ -278,6 +286,24 @@ public class Tank extends Entity {
             if (weatherMod != 0) {
                 j = Math.max(j + weatherMod, 0);
             }
+            if (getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_SNOW)) {
+                if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_ICE_STORM)) {
+                    j += 2;
+                }
+
+                if ((game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_SLEET)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_LIGHT_SNOW)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_MOD_SNOW)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_HEAVY_SNOW)
+                        || (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WE_SNOW_FLURRIES)) {
+                    j += 1;
+                }
+            }
+
+            if(getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_WIND)
+                    && (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WI_TORNADO_F13)) {
+                j += 1;
+            }
         }
 
         if (!ignoremodulararmor && hasModularArmor()) {
@@ -290,7 +316,7 @@ public class Tank extends Entity {
         if (gravity) {
             j = applyGravityEffectsOnMP(j);
         }
-        
+
         //If the unit is towing trailers, adjust its walkMP, TW p205
         if (!getAllTowedUnits().isEmpty()) {
             double trainWeight = getWeight();
@@ -316,10 +342,10 @@ public class Tank extends Entity {
         return j;
 
     }
-    
+
     @Override
     public boolean isEligibleForPavementBonus() {
-        return movementMode == EntityMovementMode.TRACKED || movementMode == EntityMovementMode.WHEELED;
+        return movementMode == EntityMovementMode.TRACKED || movementMode == EntityMovementMode.WHEELED || movementMode == EntityMovementMode.HOVER;
     }
 
     public boolean isTurretLocked(int turret) {
@@ -361,7 +387,7 @@ public class Tank extends Entity {
         }
         return 7;
     }
-    
+
     @Override
     public int getBodyLocation() {
         return LOC_BODY;
@@ -444,11 +470,11 @@ public class Tank extends Entity {
     public void setCommanderHit(boolean hit) {
         commanderHit = hit;
     }
-    
+
     public boolean isUsingConsoleCommander() {
         return usingConsoleCommander;
     }
-    
+
     public void setUsingConsoleCommander(boolean b) {
         usingConsoleCommander = b;
     }
@@ -522,7 +548,7 @@ public class Tank extends Entity {
         }
         return m_bImmobile || super.isImmobile(checkCrew);
     }
-    
+
     /**
      * Whether this unit is irreversibly immobilized for the rest of the game.
      * Tanks have some additional criteria.
@@ -531,7 +557,7 @@ public class Tank extends Entity {
     public boolean isPermanentlyImmobilized(boolean checkCrew) {
         return super.isPermanentlyImmobilized(checkCrew) || isMovementHit();
     }
-    
+
     @Override
     public boolean hasCommandConsoleBonus() {
         if (!hasWorkingMisc(MiscType.F_COMMAND_CONSOLE) || isCommanderHit() || isUsingConsoleCommander()) {
@@ -584,10 +610,18 @@ public class Tank extends Entity {
         boolean isAmphibious = hasWorkingMisc(MiscType.F_FULLY_AMPHIBIOUS);
         boolean hexHasRoad = hex.containsTerrain(Terrains.ROAD);
         boolean scoutBikeIntoLightWoods = (hex.terrainLevel(Terrains.WOODS) == 1) && hasQuirk(OptionsConstants.QUIRK_POS_SCOUT_BIKE);
+        boolean isCrossCountry = hasAbility(OptionsConstants.PILOT_CROSS_COUNTRY);
 
         // roads allow movement through hexes that you normally couldn't go through
         switch (movementMode) {
             case TRACKED:
+                if (isCrossCountry && !isSuperHeavy()) {
+                    return ((hex.terrainLevel(Terrains.WATER) > 0)
+                                    && !hex.containsTerrain(Terrains.ICE)
+                                    && !hasFlotationHull && !isAmphibious)
+                            || (hex.terrainLevel(Terrains.MAGMA) > 1);
+                }
+
                 if (!isSuperHeavy()) {
                     return ((hex.terrainLevel(Terrains.WOODS) > 1) && !hexHasRoad)
                             || ((hex.terrainLevel(Terrains.WATER) > 0)
@@ -606,6 +640,15 @@ public class Tank extends Entity {
                             || (hex.terrainLevel(Terrains.MAGMA) > 1);
                 }
             case WHEELED:
+                if (isCrossCountry && !isSuperHeavy()) {
+                    return ((hex.terrainLevel(Terrains.WATER) > 0)
+                                    && !hex.containsTerrain(Terrains.ICE)
+                                    && !hasFlotationHull && !isAmphibious)
+                            || hex.containsTerrain(Terrains.MAGMA)
+                            || ((hex.terrainLevel(Terrains.SNOW) > 1) && !hexHasRoad)
+                            || (hex.terrainLevel(Terrains.GEYSER) == 2);
+                }
+
                 if (!isSuperHeavy()) {
                     return (hex.containsTerrain(Terrains.WOODS) && !hexHasRoad && !scoutBikeIntoLightWoods)
                             || (hex.containsTerrain(Terrains.ROUGH) && !hexHasRoad)
@@ -629,7 +672,11 @@ public class Tank extends Entity {
                             || (hex.terrainLevel(Terrains.GEYSER) == 2);
                 }
             case HOVER:
-                if (!isSuperHeavy()) {                    
+               if (isCrossCountry && !isSuperHeavy()) {
+                    return (hex.terrainLevel(Terrains.MAGMA) > 1);
+                }
+
+                if (!isSuperHeavy()) {
                     return (hex.containsTerrain(Terrains.WOODS) && !hexHasRoad && !scoutBikeIntoLightWoods)
                             || (hex.containsTerrain(Terrains.JUNGLE) && !hexHasRoad)
                             || (hex.terrainLevel(Terrains.MAGMA) > 1)
@@ -741,6 +788,15 @@ public class Tank extends Entity {
     }
 
     @Override
+    public boolean isEligibleFor(GamePhase phase) {
+        if (dugIn != DUG_IN_NONE) {
+            return false;
+        } else {
+            return super.isEligibleFor(phase);
+        }
+    }
+
+    @Override
     public void newRound(int roundNumber) {
         super.newRound(roundNumber);
 
@@ -755,6 +811,22 @@ public class Tank extends Entity {
         if (!m_bTurretLocked) {
             setSecondaryFacing(getFacing());
         }
+
+        // Continue to fortify
+        if (dugIn != DUG_IN_NONE) {
+            dugIn++;
+            if (dugIn > DUG_IN_FORTIFYING3) {
+                dugIn = DUG_IN_NONE;
+            }
+        }
+    }
+
+    public void setDugIn(int i) {
+        dugIn = i;
+    }
+
+    public int getDugIn() {
+        return dugIn;
     }
 
     /**
@@ -813,7 +885,7 @@ public class Tank extends Entity {
     public boolean hasRearArmor(int loc) {
         return false;
     }
-    
+
     @Override
     public int firstArmorIndex() {
         return LOC_FRONT;
@@ -1235,7 +1307,7 @@ public class Tank extends Entity {
 
         return prd;
     }
-    
+
     @Override
     public boolean usesTurnMode() {
         return game != null && game.getOptions().booleanOption(OptionsConstants.ADVGRNDMOV_TURN_MODE);
@@ -1490,7 +1562,7 @@ public class Tank extends Entity {
     public int getSuspensionFactor() {
         return getSuspensionFactor(getMovementMode(), weight);
     }
-    
+
     /**
      * Static method to calculate suspension factor without needing a vehicle
      */
@@ -2095,7 +2167,7 @@ public class Tank extends Entity {
             addTransporter(new ClampMountTank());
         }
     }
-    
+
     /**
      * Add a transporter for each trailer hitch the unit is equipped with, with a maximum of
      * one each in the front and the rear. Any tractor that does not have an explicit hitch
@@ -2125,7 +2197,7 @@ public class Tank extends Entity {
             }
         }
     }
-    
+
     /**
      * Check to see if the unit has a trailer hitch transporter already
      * We need this to prevent duplicate transporters being created
@@ -2146,7 +2218,7 @@ public class Tank extends Entity {
     public boolean canSpot() {
         return super.canSpot() && (getStunnedTurns() == 0);
     }
-    
+
     /**
      * Convenience function that determines if this tank can issue an "unjam weapon" command.
      * @return True if there are any jammed weapons and the crew isn't stunned
@@ -2154,8 +2226,8 @@ public class Tank extends Entity {
     public boolean canUnjamWeapon() {
         return !getJammedWeapons().isEmpty() && getStunnedTurns() <= 0;
     }
-    
-    /** 
+
+    /**
      * Convenience function that determines if this tank can issue a "clear turret" command.
      * @return True if there are any jammed turrets and the crew isn't stunned
      */
@@ -2620,157 +2692,6 @@ public class Tank extends Entity {
         // Return the result.
         return result;
     } // End public TargetRoll getStealthModifier( char )
-    
-    @Override
-    public double getBaseBattleForceMovement() {
-        double move = getOriginalWalkMP();
-
-        if (getMisc().stream().filter(m -> m.getType().hasFlag(MiscType.F_MASC))
-                .map(m -> m.getType().getSubType())
-                .anyMatch(st -> st == MiscType.S_SUPERCHARGER)) {
-            move *= 1.25;
-        }
-
-        return move;
-    }
-    
-    @Override
-    /**
-     * returns the battle force structure points for a vehicle.
-     * Composite and Reinforced structures are Mech only, so we don't need to worry
-     */
-    public int getBattleForceStructurePoints() {
-        int struct = 0;
-        for (int i = 0; i < getLocationNames().length; i++) {
-            struct += this.getInternal(i);
-        }
-        return (int) Math.ceil(struct / 10.0);
-    }
-    
-    /**
-     * Separate turret weapons from body-mounted
-     */
-    @Override
-    public int getNumBattleForceWeaponsLocations() {
-        if (m_bHasNoTurret) {
-            return 2;
-        } else if (m_bHasNoDualTurret) {
-            return 3;
-        } else {
-            return 4;
-        }
-    }
-    
-    @Override
-    public String getBattleForceLocationName(int index) {
-        if (index == 1) {
-            return "REAR";
-        }
-        if (index > 1) {
-            if (m_bHasNoDualTurret) {
-                return "TUR";
-            } else {
-                return "TUR" + index;
-            }
-        } else {
-            return "";
-        }
-    }
-
-    /**
-     * index 0 (Front, Left, Right)
-     * index 1+ (Turret(s))
-     */
-    @Override
-    public double getBattleForceLocationMultiplier(int index, int location, boolean rearMounted) {
-        switch (index) {
-            case 0:
-                if (location > LOC_BODY && location < LOC_TURRET) {
-                    return 1.0;
-                }
-                break;
-            case 1:
-                if (location == LOC_REAR) {
-                    return 1.0;
-                }
-                break;
-            case 2:
-                if (location == LOC_TURRET) {
-                    return 1.0;
-                }
-                break;
-            case 3:
-                if (location == LOC_TURRET_2) {
-                    return 1.0;
-                }
-                break;
-        }
-        return 0; 
-    }
-
-    /**
-     * AlphaStrike combines turrets with the overall (front) damage values.
-     */
-    @Override
-    public double getAlphaStrikeLocationMultiplier(int index, int location, boolean rearMounted) {
-        if (index == 0) {
-            return location > LOC_BODY? 1.0 : 0.0;
-        }
-        return getBattleForceLocationMultiplier(index, location, rearMounted);
-    }
-    
-    @Override
-    public void addBattleForceSpecialAbilities(Map<BattleForceSPA,Integer> specialAbilities) {
-        super.addBattleForceSpecialAbilities(specialAbilities);
-        if (!isSupportVehicle()) {
-            specialAbilities.put(BattleForceSPA.SRCH, null);
-        }
-        for (Mounted m : getEquipment()) {
-            if (m.getType().hasFlag(MiscType.F_ADVANCED_FIRECONTROL)) {
-                specialAbilities.put(BattleForceSPA.AFC, null);
-            } else if (m.getType().hasFlag(MiscType.F_BASIC_FIRECONTROL)) {
-                specialAbilities.put(BattleForceSPA.BFC, null);
-            } else if (m.getType().hasFlag(MiscType.F_AMPHIBIOUS)) {
-                specialAbilities.put(BattleForceSPA.AMP, null);
-            } else if (m.getType().hasFlag(MiscType.F_ARMORED_MOTIVE_SYSTEM)) {
-                specialAbilities.put(BattleForceSPA.ARS, null);
-            } else if (m.getType().hasFlag(MiscType.F_ENVIRONMENTAL_SEALING)) {
-                specialAbilities.put(BattleForceSPA.SEAL, null);
-                if (hasEngine() && getEngine().getEngineType() != Engine.COMBUSTION_ENGINE
-                        && getEngine().getEngineType() != Engine.STEAM) {
-                    specialAbilities.put(BattleForceSPA.SOA, null);
-                }
-            } else if (m.getType().hasFlag(MiscType.F_VEHICLE_MINE_DISPENSER)) { 
-                specialAbilities.merge(BattleForceSPA.MDS, 1, Integer::sum);
-            } else if (m.getType().hasFlag(MiscType.F_MINESWEEPER)) {
-                specialAbilities.put(BattleForceSPA.MSW, null);
-            } else if (m.getType().hasFlag(MiscType.F_MASH)) {
-                specialAbilities.merge(BattleForceSPA.MASH, (int) m.getSize(), Integer::sum);
-            } else if (m.getType().hasFlag(MiscType.F_MOBILE_FIELD_BASE)) {
-                specialAbilities.put(BattleForceSPA.MFB, null);
-            } else if (m.getType().hasFlag(MiscType.F_COMMAND_CONSOLE)) {
-                specialAbilities.merge(BattleForceSPA.MHQ, 1, Integer::sum);
-            } else if (m.getType().hasFlag(MiscType.F_OFF_ROAD)) {
-                specialAbilities.put(BattleForceSPA.ORO, null);
-            } else if (m.getType().hasFlag(MiscType.F_DUNE_BUGGY)) {
-                specialAbilities.put(BattleForceSPA.DUN, null);
-            } else if (m.getType().hasFlag(MiscType.F_TRACTOR_MODIFICATION)
-                    || m.getType().hasFlag(MiscType.F_TRAILER_MODIFICATION)) {
-                specialAbilities.put(BattleForceSPA.HTC, null);
-            }
-            //TODO: Fire-resistant chassis mod
-        }
-    }
-    
-    @Override
-    public boolean isBattleForceTurretLocation(int index) {
-        return index > 1;
-    }
-
-    @Override
-    public boolean isBattleForceRearLocation(int index) {
-        return index == 1;
-    }
 
     @Override
     public int getEngineHits() {
@@ -3145,12 +3066,12 @@ public class Tank extends Entity {
     public int getSpriteDrawPriority() {
         return 4;
     }
-    
+
     //Specific road/rail train rules
-    
+
     /**
      * Used to determine if this vehicle can be towed by a tractor
-     * 
+     *
      * @return Whether the unit is constructed as a trailer
      */
     @Override
@@ -3167,11 +3088,11 @@ public class Tank extends Entity {
     public void setTrailer(boolean trailer) {
         this.trailer = trailer;
     }
-    
+
     /**
-     * Used to determine if this vehicle can be the engine/tractor 
+     * Used to determine if this vehicle can be the engine/tractor
      * for a bunch of trailers
-     * 
+     *
      * @return
      */
     @Override
@@ -3186,5 +3107,14 @@ public class Tank extends Entity {
         }
         return false;
     }
-    
+
+    @Override
+    public boolean isCombatVehicle() {
+        return !isSupportVehicle();
+    }
+
+    @Override
+    public boolean getsAutoExternalSearchlight() {
+        return true;
+    }
 }

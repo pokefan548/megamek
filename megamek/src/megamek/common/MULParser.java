@@ -827,7 +827,7 @@ public class MULParser {
             
             String infSquadNum = entityTag.getAttribute(INF_SQUAD_NUM);
             if (!infSquadNum.isBlank()) {
-                inf.setSquadN(Integer.parseInt(infSquadNum));
+                inf.setSquadCount(Integer.parseInt(infSquadNum));
                 inf.autoSetInternal();
             }
         }
@@ -1449,15 +1449,15 @@ public class MULParser {
                 }
             } else if (type.equals(INTERNAL)) {
                 if (entity.getOInternal(loc) < pointsVal) {
-                    warning.append("The entity, ")
-                            .append(entity.getShortName())
-                            .append(" does not start with ")
-                            .append(pointsVal)
-                            .append(" points of internal structure for " +
-                                    "location: ")
+                    warning.append("The entity, ").append(entity.getShortName()).append(" does not start with ")
+                            .append(pointsVal).append(" points of internal structure for location: ")
                             .append(loc).append(".\n");
                 } else {
                     entity.setInternal(pointsVal, loc);
+                    if (entity instanceof Infantry) {
+                        ((Infantry) entity).damageOrRestoreFieldWeapons();
+                        entity.applyDamage();
+                    }
                 }
             } else if (type.equals(REAR)) {
                 if (!entity.hasRearArmor(loc)) {
@@ -2689,6 +2689,10 @@ public class MULParser {
         // mark armor, internal as destroyed
         en.setArmor(IArmorState.ARMOR_DESTROYED, loc, false);
         en.setInternal(IArmorState.ARMOR_DESTROYED, loc);
+        if (en instanceof Infantry) {
+            ((Infantry) en).damageOrRestoreFieldWeapons();
+            en.applyDamage();
+        }
         if (en.hasRearArmor(loc)) {
             en.setArmor(IArmorState.ARMOR_DESTROYED, loc, true);
         }

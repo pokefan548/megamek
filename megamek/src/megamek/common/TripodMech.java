@@ -95,6 +95,11 @@ public class TripodMech extends Mech {
         return Entity.ETYPE_MECH | Entity.ETYPE_TRIPOD_MECH;
     }
 
+    @Override
+    public boolean isTripodMek() {
+        return true;
+    }
+
     /**
      * Returns true if the entity can flip its arms
      */
@@ -217,6 +222,10 @@ public class TripodMech extends Mech {
                                  .getMovementMods(this);
             if (weatherMod != 0) {
                 wmp = Math.max(wmp + weatherMod, 0);
+            }
+            if (getCrew().getOptions().stringOption(OptionsConstants.MISC_ENV_SPECIALIST).equals(Crew.ENVSPC_WIND)
+                    && (game.getPlanetaryConditions().getWeather() == PlanetaryConditions.WI_TORNADO_F13)) {
+                wmp += 1;
             }
         }
         // gravity
@@ -1631,22 +1640,22 @@ public class TripodMech extends Mech {
     public boolean isValidSecondaryFacing(int dir) {
         return canChangeSecondaryFacing();
     }
-    
+
     /**
      * Based on the mech's current damage status, return valid brace locations.
      */
     @Override
     public List<Integer> getValidBraceLocations() {
         List<Integer> validLocations = new ArrayList<>();
-        
+
         if (!isLocationBad(Mech.LOC_RARM)) {
             validLocations.add(Mech.LOC_RARM);
         }
-        
+
         if (!isLocationBad(Mech.LOC_LARM)) {
             validLocations.add(Mech.LOC_LARM);
         }
-        
+
         return validLocations;
     }
 
@@ -1659,7 +1668,7 @@ public class TripodMech extends Mech {
                 || !isLocationBad(Mech.LOC_LARM))
                 && !isProne();
     }
-    
+
     @Override
     public int getBraceMPCost() {
         return 1;
